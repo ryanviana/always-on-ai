@@ -277,4 +277,7 @@ results/
 
 # Memory and cache files
 memory/cache/
-*.cache 
+*.cache
+
+# Context storage
+context_storage/ 
