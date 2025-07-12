@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple real-time transcription with OpenAI Realtime API
+Real-time transcription with OpenAI Realtime API
 Uses WebSocket connection with server-side VAD
 """
 
@@ -32,7 +32,7 @@ load_dotenv()
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-class SimpleTranscriber:
+class RealtimeTranscriber:
     def __init__(self, trigger_manager=None, speech_started_callback=None, speech_stopped_callback=None, use_conversation_manager=True):
         self.ws = None
         self.running = False
@@ -412,12 +412,12 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     
     # Create and run transcriber
-    transcriber = SimpleTranscriber()
+    transcriber = RealtimeTranscriber()
     
     colors = DISPLAY_CONFIG["colors"]
     emojis = DISPLAY_CONFIG["emojis"]
     
-    print(f"{emojis['rocket']} Starting Simple Transcriber")
+    print(f"{emojis['rocket']} Starting Realtime Transcriber")
     print("=" * 40)
     
     try:

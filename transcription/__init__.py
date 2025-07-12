@@ -2,6 +2,6 @@
 Real-time transcription components
 """
 
-from .simple_transcriber import SimpleTranscriber
+from .simple_transcriber import RealtimeTranscriber
 
-__all__ = ["SimpleTranscriber"]
+__all__ = ["RealtimeTranscriber"]
