@@ -51,16 +51,26 @@ class OpenAITTSService:
             self.event_loop = asyncio.new_event_loop()
             
             def run_loop():
-                asyncio.set_event_loop(self.event_loop)
-                # Create queue in the correct event loop
-                self.tts_queue = asyncio.Queue()
-                self.processing_task = self.event_loop.create_task(self._process_tts_queue())
-                self.event_loop.run_forever()
+                try:
+                    asyncio.set_event_loop(self.event_loop)
+                    # Create queue in the correct event loop
+                    self.tts_queue = asyncio.Queue()
+                    self.processing_task = self.event_loop.create_task(self._process_tts_queue())
+                    self.event_loop.run_forever()
+                finally:
+                    # Ensure loop is closed if thread exits
+                    if self.event_loop and not self.event_loop.is_closed():
+                        self.event_loop.close()
             
             threading.Thread(target=run_loop, daemon=True).start()
             print("OpenAI TTS service ready (simple implementation)")
             
         except Exception as e:
+            # Clean up on failure
+            self.connected = False
+            if self.event_loop and not self.event_loop.is_closed():
+                self.event_loop.close()
+            self.event_loop = None
             print(f"Failed to initialize OpenAI TTS service: {e}")
             raise ConnectionError(f"Failed to initialize OpenAI TTS service: {e}")
             
@@ -231,8 +241,30 @@ class OpenAITTSService:
     def disconnect(self):
         """Disconnect the TTS service"""
         self.connected = False
+        
+        # Cancel any pending tasks
+        if self.processing_task and not self.processing_task.done():
+            self.processing_task.cancel()
+        
+        # Stop and close the event loop properly
         if self.event_loop:
+            # Stop the loop
             self.event_loop.call_soon_threadsafe(self.event_loop.stop)
+            
+            # Wait a bit for the loop to stop
+            import time
+            time.sleep(0.1)
+            
+            # Close the loop to free resources
+            if not self.event_loop.is_closed():
+                try:
+                    # Note: This might raise if called from wrong thread
+                    # but we still need to attempt cleanup
+                    self.event_loop.close()
+                except RuntimeError:
+                    pass  # Loop might be running in another thread
+            
+            self.event_loop = None
             
     def get_available_voices(self):
         """Get list of available voices"""

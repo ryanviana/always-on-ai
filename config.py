@@ -281,7 +281,18 @@ TTS_CONFIG = {
 }
 
 # Connection timeout for transcription
-CONNECTION_TIMEOUT = 20.0  # Timeout for WebSocket connection in seconds
+CONNECTION_TIMEOUT = 20.0
+
+# System timing configuration
+TIMING_CONFIG = {
+    "context_summarization_interval": 5.0,  # How often to check for summarization (seconds)
+    "context_error_retry_delay": 10.0,  # Delay after context error before retry (seconds)
+    "audio_stream_cleanup_delay": 0.1,  # Delay for audio stream cleanup (seconds)
+    "tts_queue_check_interval": 0.1,  # TTS queue processing interval (seconds)
+    "tts_chunk_delay": 0.01,  # Delay between TTS audio chunks (seconds)
+    "conversation_check_interval": 0.05,  # Conversation state check interval (seconds)
+    "health_monitor_interval": 1.0,  # Health check interval (seconds)
+}  # Timeout for WebSocket connection in seconds
 
 # Logging configuration
 LOGGING_CONFIG = {

@@ -281,3 +281,5 @@ memory/cache/
 
 # Context storage
 context_storage/ 
+# API Security
+context/.api_key

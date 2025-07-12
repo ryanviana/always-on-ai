@@ -8,6 +8,9 @@ import base64
 import pyaudio
 from config import AUDIO_CONFIG, DISPLAY_CONFIG
 from events import event_bus, EventTypes
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class AudioStreamManager:
@@ -59,6 +62,7 @@ class AudioStreamManager:
         
         colors = DISPLAY_CONFIG["colors"]
         emojis = DISPLAY_CONFIG["emojis"]
+        logger.info("Audio stream started")
         print(f"{colors['info']}{emojis['mic']} Audio stream started{colors['reset']}")
         
         # Emit audio capture start event
@@ -73,22 +77,23 @@ class AudioStreamManager:
         
     def stop(self):
         """Stop audio capture"""
+        # First, signal the audio thread to stop
         self.running = False
         
-        # Clear all consumers first to prevent them from accessing freed resources
+        # Wait for audio thread to finish processing
+        if self.audio_thread:
+            self.audio_thread.join(timeout=2.0)
+            if self.audio_thread.is_alive():
+                logger.warning("Audio thread did not exit in time")
+        
+        # Now it's safe to clear consumers
         with self.consumers_lock:
             self.consumers.clear()
             self.failed_consumers.clear()
             # Also clear paused consumers and reset pause state
             self.paused_consumers.clear()
             self.is_paused = False
-            print("Cleared all audio consumers")
-        
-        # Wait for audio thread to finish
-        if self.audio_thread:
-            self.audio_thread.join(timeout=2.0)
-            if self.audio_thread.is_alive():
-                print("Warning: Audio thread did not exit in time")
+            logger.debug("Cleared all audio consumers")
             
         # Stop and close stream before terminating PyAudio
         if self.stream:
@@ -97,16 +102,17 @@ class AudioStreamManager:
                 self.stream.close()
                 self.stream = None
             except Exception as e:
-                print(f"Error closing audio stream: {e}")
+                logger.error(f"Error closing audio stream: {e}", exc_info=True)
             
         # Finally terminate PyAudio
         try:
             self.audio.terminate()
         except Exception as e:
-            print(f"Error terminating PyAudio: {e}")
+            logger.error(f"Error terminating PyAudio: {e}", exc_info=True)
         
         colors = DISPLAY_CONFIG["colors"]
         emojis = DISPLAY_CONFIG["emojis"]
+        logger.info("Audio stream stopped")
         print(f"{colors['info']}{emojis['stop']} Audio stream stopped{colors['reset']}")
         
         # Emit audio capture stop event
@@ -159,17 +165,19 @@ class AudioStreamManager:
                         # Only log and track failures if we're still running
                         if self.running:
                             colors = DISPLAY_CONFIG["colors"]
+                            logger.error(f"Consumer error: {e}", exc_info=True)
                             print(f"{colors['error']}Consumer error: {e}{colors['reset']}")
                             
                             # Track failed consumers to avoid repeated errors
                             with self.consumers_lock:
                                 if consumer not in self.failed_consumers:
                                     self.failed_consumers.add(consumer)
-                                    print(f"{colors['error']}Consumer marked as failed and will be skipped{colors['reset']}")
+                                    logger.warning("Consumer marked as failed and will be skipped")
                         
             except Exception as e:
                 if self.running:
                     colors = DISPLAY_CONFIG["colors"]
+                    logger.error(f"Audio capture error: {e}", exc_info=True)
                     print(f"{colors['error']}Audio capture error: {e}{colors['reset']}")
                     # Try to recover only if stream is still valid
                     if self.stream:
@@ -178,13 +186,13 @@ class AudioStreamManager:
                 break
         
         colors = DISPLAY_CONFIG["colors"]
-        print(f"{colors['info']}[AUDIO] Audio loop ended{colors['reset']}")
+        logger.info("Audio loop ended")
         
     def pause_microphone(self):
         """Pause microphone by temporarily removing all consumers"""
         with self.consumers_lock:
             if self.is_paused:
-                print("[AUDIO] Microphone already paused")
+                logger.debug("Microphone already paused")
                 return
                 
             # Store current consumers
@@ -194,7 +202,7 @@ class AudioStreamManager:
             self.is_paused = True
             
             colors = DISPLAY_CONFIG["colors"]
-            print(f"{colors['info']}[AUDIO] Microphone paused - stored {len(self.paused_consumers)} consumers{colors['reset']}")
+            logger.info(f"Microphone paused - stored {len(self.paused_consumers)} consumers")
             
             # Emit microphone pause event
             event_bus.emit(EventTypes.AUDIO_MICROPHONE_PAUSE, {
@@ -205,7 +213,7 @@ class AudioStreamManager:
         """Resume microphone by restoring consumers"""
         with self.consumers_lock:
             if not self.is_paused:
-                print("[AUDIO] Microphone not paused")
+                logger.debug("Microphone not paused")
                 return
                 
             # Restore consumers
@@ -218,7 +226,7 @@ class AudioStreamManager:
                 self.failed_consumers.discard(consumer)
             
             colors = DISPLAY_CONFIG["colors"]
-            print(f"{colors['info']}[AUDIO] Microphone resumed - restored {len(self.consumers)} consumers{colors['reset']}")
+            logger.info(f"Microphone resumed - restored {len(self.consumers)} consumers")
             
             # Emit microphone resume event
             event_bus.emit(EventTypes.AUDIO_MICROPHONE_RESUME, {

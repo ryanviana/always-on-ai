@@ -43,6 +43,9 @@ class TriggerManager:
         self._request_queue = Queue()
         self._active_requests = {}  # Track active validation tasks
         self._request_counter = 0
+        self._latest_request_number = 0  # Track the latest request number
+        self._request_id_to_number = {}  # Map request IDs to request numbers
+        self._request_lock = threading.Lock()  # Thread safety for request tracking
         self._processing_thread = threading.Thread(target=self._process_request_queue, daemon=True)
         self._processing_thread.start()
         
@@ -117,7 +120,12 @@ class TriggerManager:
         if matching_triggers:
             request_id = str(uuid.uuid4())
             timestamp = time.time()
-            self._request_counter += 1
+            
+            with self._request_lock:
+                self._request_counter += 1
+                current_request_number = self._request_counter
+                self._latest_request_number = current_request_number
+                self._request_id_to_number[request_id] = current_request_number
             
             self.logger.info(f"🧠 STAGE 2: {len(matching_triggers)} triggers matched, queuing LLM validation...")
             for trigger in matching_triggers:
@@ -132,10 +140,10 @@ class TriggerManager:
                 'text': text,
                 'triggers': matching_triggers,
                 'timestamp': timestamp,
-                'number': self._request_counter
+                'number': current_request_number
             }
             
-            self.logger.info(f"📋 QUEUE: Adding validation request #{self._request_counter}")
+            self.logger.info(f"📋 QUEUE: Adding validation request #{current_request_number}")
             self._request_queue.put(request)
         else:
             self.logger.info("⏭️ STAGE 1 RESULT: No triggers matched - pipeline complete")
@@ -159,28 +167,12 @@ class TriggerManager:
                 # Get next request with a short timeout
                 request = self._request_queue.get(timeout=0.1)
                 
-                # Check if we should skip this request by looking for newer ones
-                # Use a temporary list to check without consuming items
-                newer_requests = []
-                should_skip = False
+                # Check if this request is still the latest by comparing request numbers
+                with self._request_lock:
+                    is_latest = request['number'] == self._latest_request_number
                 
-                # Peek at queue contents without blocking
-                try:
-                    while True:
-                        newer_req = self._request_queue.get_nowait()
-                        newer_requests.append(newer_req)
-                        # If we find a newer request, we should skip the current one
-                        if newer_req['number'] > request['number']:
-                            should_skip = True
-                except Empty:
-                    pass
-                
-                # Put back all the newer requests we found
-                for req in newer_requests:
-                    self._request_queue.put(req)
-                
-                if should_skip:
-                    self.logger.debug(f"Skipping request {request['number']} as newer requests exist")
+                if not is_latest:
+                    self.logger.debug(f"Skipping request {request['number']} as newer request {self._latest_request_number} exists")
                     continue
                     
                 # Process this request
@@ -222,7 +214,8 @@ class TriggerManager:
             futures_list.append(future)
             
         # Store active futures for this request
-        self._active_requests[request_id] = futures_list
+        with self._request_lock:
+            self._active_requests[request_id] = futures_list
         
         # Wait for all validations to complete
         done, pending = wait(validation_futures.keys(), timeout=self.validation_timeout)
@@ -231,8 +224,12 @@ class TriggerManager:
         for future in pending:
             future.cancel()
             
-        # Check if this request is still the latest
-        if self._request_queue.qsize() > 0:
+        # Check if newer requests have arrived during validation
+        with self._request_lock:
+            request_number = self._request_id_to_number.get(request_id, 0)
+            is_latest = request_number == self._latest_request_number
+        
+        if not is_latest:
             self.logger.info(f"⏭️ Newer requests detected, cancelling execution for request {request_id}")
             # Properly cancel all futures before cleanup
             if request_id in self._active_requests:
@@ -241,6 +238,9 @@ class TriggerManager:
                     if not future.done():
                         future.cancel()
                 del self._active_requests[request_id]
+            # Clean up request tracking
+            with self._request_lock:
+                self._request_id_to_number.pop(request_id, None)
             return
             
         # Collect validated triggers with their results
@@ -300,6 +300,10 @@ class TriggerManager:
                 if not future.done() and not future.cancelled():
                     future.cancel()
             del self._active_requests[request_id]
+        
+        # Clean up request tracking to prevent memory leak
+        with self._request_lock:
+            self._request_id_to_number.pop(request_id, None)
         
     def _run_validation_only(self, trigger: BaseTrigger, context: str) -> Optional[Dict[str, Any]]:
         """Run validation only (without execution) in a separate thread"""

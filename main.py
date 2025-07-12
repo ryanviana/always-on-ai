@@ -99,8 +99,10 @@ class VoiceTranscriber:
                                 transcript = event.get("transcript", "")
                                 if transcript and not self.transcriber.paused:
                                     add_to_context(transcript)
-                        except:
-                            pass
+                        except json.JSONDecodeError as e:
+                            self.logger.debug(f"Failed to parse message as JSON: {e}")
+                        except Exception as e:
+                            self.logger.warning(f"Error processing context manager message: {e}")
                             
                         return result
                     

@@ -131,13 +131,18 @@ class ContextWebSocketServer:
             
     def run_in_thread(self):
         """Run the server in a separate thread"""
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        
+        self.loop = None
         try:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
             self.loop.run_until_complete(self.start_server())
         except Exception as e:
             logger.error(f"WebSocket server error: {e}")
+        finally:
+            # Always close the loop to prevent resource leaks
+            if self.loop and not self.loop.is_closed():
+                self.loop.close()
+                self.loop = None
             
     def start(self):
         """Start the WebSocket server in a background thread"""

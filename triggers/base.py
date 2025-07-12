@@ -17,6 +17,10 @@ from .exceptions import TriggerValidationError, LLMConnectionError
 class BaseTrigger(ABC):
     """Abstract base class for all triggers"""
     
+    # Class-level OpenAI client cache
+    _openai_client = None
+    _api_key_checked = False
+    
     def __init__(self):
         self.name = self.__class__.__name__
         self.enabled = True
@@ -86,17 +90,32 @@ class BaseTrigger(ABC):
         }
         
         return template.render(**context)
+    
+    @classmethod
+    def _get_openai_client(cls):
+        """Get or create the shared OpenAI client"""
+        # Check if we already have a client
+        if cls._openai_client is not None:
+            return cls._openai_client
+        
+        # Check API key only once
+        if not cls._api_key_checked:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise LLMConnectionError("OPENAI_API_KEY not found in environment")
+            cls._api_key_checked = True
+            
+            # Create the client once
+            cls._openai_client = openai.AsyncOpenAI(api_key=api_key)
+        
+        return cls._openai_client
         
     async def validate_with_llm(self, context: str, model: str = "gpt-4o-mini", 
                                template_env: Optional[Environment] = None) -> Optional[Dict[str, Any]]:
         """Validate trigger with LLM using conversation context and jinja2 template"""
         try:
-            # Create OpenAI client
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                self.logger.error("OPENAI_API_KEY not found in environment")
-                return None
-            client = openai.AsyncOpenAI(api_key=api_key)
+            # Get the shared OpenAI client
+            client = self._get_openai_client()
             
             self.logger.debug(f"Validating with {model}")
             

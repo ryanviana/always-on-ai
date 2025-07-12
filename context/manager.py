@@ -199,19 +199,26 @@ class EnhancedContextManager:
                                 
                     if should_create_summary:
                         # Run summarization
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        loop.run_until_complete(self._create_summary())
-                        loop.close()
-                        
-                        self._last_summary_time = current_time
+                        loop = None
+                        try:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            loop.run_until_complete(self._create_summary())
+                            
+                            self._last_summary_time = current_time
+                        finally:
+                            # Always close the loop to prevent resource leaks
+                            if loop and not loop.is_closed():
+                                loop.close()
                         
                 # Sleep briefly
-                time.sleep(5.0)
+                from config import TIMING_CONFIG
+                time.sleep(TIMING_CONFIG.get("context_summarization_interval", 5.0))
                 
             except Exception as e:
                 print(f"Error in summarization worker: {e}")
-                time.sleep(10.0)
+                from config import TIMING_CONFIG
+                time.sleep(TIMING_CONFIG.get("context_error_retry_delay", 10.0))
                 
     async def _create_summary(self):
         """Perform the actual summarization"""

@@ -7,9 +7,12 @@ import json
 import threading
 from typing import Dict, Any, List, Callable, Optional
 from queue import Queue, Empty
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime
 import uuid
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class SystemEvent:
@@ -41,7 +44,7 @@ class EventBus:
     def __init__(self):
         self.listeners: Dict[str, List[Callable]] = defaultdict(list)
         self.event_queue = Queue()
-        self.event_history: List[SystemEvent] = []
+        self.event_history = deque(maxlen=1000)  # Automatic size limiting with O(1) operations
         self.max_history = 1000
         self._running = True
         self._processor_thread = threading.Thread(target=self._process_events, daemon=True)
@@ -49,7 +52,7 @@ class EventBus:
         
         # Performance metrics
         self.event_counts = defaultdict(int)
-        self.processing_times = defaultdict(list)
+        self.processing_times = defaultdict(lambda: deque(maxlen=100))  # Limit to last 100 measurements
         
     def emit(self, event_type: str, data: Dict[str, Any], source: str = None):
         """Emit an event to the bus"""
@@ -79,35 +82,31 @@ class EventBus:
                 # Track event
                 self.event_counts[event.type] += 1
                 
-                # Add to history
+                # Add to history (deque automatically handles size limit)
                 self.event_history.append(event)
-                if len(self.event_history) > self.max_history:
-                    self.event_history.pop(0)
                 
                 # Notify specific listeners
                 for listener in self.listeners.get(event.type, []):
                     try:
                         listener(event)
                     except Exception as e:
-                        print(f"Error in event listener for {event.type}: {e}")
+                        logger.error(f"Error in event listener for {event.type}: {e}", exc_info=True)
                         
                 # Notify wildcard listeners
                 for listener in self.listeners.get("*", []):
                     try:
                         listener(event)
                     except Exception as e:
-                        print(f"Error in wildcard event listener: {e}")
+                        logger.error(f"Error in wildcard event listener: {e}", exc_info=True)
                         
-                # Track processing time
+                # Track processing time (deque automatically handles size limit)
                 processing_time = time.time() - start_time
                 self.processing_times[event.type].append(processing_time)
-                if len(self.processing_times[event.type]) > 100:
-                    self.processing_times[event.type].pop(0)
                     
             except Empty:
                 continue
             except Exception as e:
-                print(f"Error processing event: {e}")
+                logger.error(f"Error processing event: {e}", exc_info=True)
                 
     def get_stats(self) -> Dict[str, Any]:
         """Get event bus statistics"""
