@@ -170,3 +170,11 @@ class EventTypes:
     SYSTEM_START = "system.start"
     SYSTEM_STOP = "system.stop"
     SYSTEM_ERROR = "system.error"
+    
+    # Trigger events
+    TRIGGER_KEYWORD_MATCH = "trigger.keyword_match"
+    TRIGGER_VALIDATION_START = "trigger.validation_start"
+    TRIGGER_VALIDATION_COMPLETE = "trigger.validation_complete"
+    TRIGGER_EXECUTION_START = "trigger.execution_start"
+    TRIGGER_EXECUTION_COMPLETE = "trigger.execution_complete"
+    TRIGGER_EXECUTION_ERROR = "trigger.execution_error"
