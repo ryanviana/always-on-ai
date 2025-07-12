@@ -10,17 +10,30 @@ import time
 from audio_stream import AudioStreamManager
 from transcription.simple_transcriber import RealtimeTranscriber
 from config import (
-    DISPLAY_CONFIG, CONVERSATION_CONFIG, CONTEXT_CONFIG, LOGGING_CONFIG, CONNECTION_TIMEOUT
+    DISPLAY_CONFIG, CONVERSATION_CONFIG, CONTEXT_CONFIG, LOGGING_CONFIG, CONNECTION_TIMEOUT,
+    TRIGGER_CONFIG, TTS_CONFIG
 )
 from logging_config import setup_logging, get_logger
 from context import EnhancedContextManager, ContextPersistence, setup_context_access, MeetingSessionManager
 from datetime import datetime
+from triggers import TriggerManager
 
 
 class VoiceTranscriber:
     def __init__(self):
         self.logger = get_logger(__name__)
         self.audio_manager = AudioStreamManager()
+        
+        # Initialize TTS if enabled
+        self.tts_service = None
+        self.audio_output = None
+        if TTS_CONFIG.get("enabled", False):
+            self._setup_tts()
+        
+        # Initialize trigger system
+        self.trigger_manager = None
+        if TRIGGER_CONFIG.get("enabled", False):
+            self.trigger_manager = self._setup_triggers()
         
         # Initialize context management
         self.context_manager = None
@@ -36,9 +49,9 @@ class VoiceTranscriber:
                 except Exception as e:
                     self.logger.warning("Could not start context access servers", exc_info=True, extra={"extra_data": {"error": str(e)}})
         
-        # Initialize transcriber with context support
+        # Initialize transcriber with context and trigger support
         self.transcriber = RealtimeTranscriber(
-            trigger_manager=None,
+            trigger_manager=self.trigger_manager,
             speech_started_callback=None,
             speech_stopped_callback=None,
             use_conversation_manager=CONVERSATION_CONFIG.get("enabled", False),
@@ -126,6 +139,92 @@ class VoiceTranscriber:
             
         return context_manager
         
+    def _setup_tts(self):
+        """Setup TTS services"""
+        from tts import OpenAITTSService, AudioOutputManager
+        
+        self.logger.info("🔊 Initializing TTS services...")
+        
+        # Create audio output manager
+        self.audio_output = AudioOutputManager()
+        
+        # Create TTS service
+        self.tts_service = OpenAITTSService()
+        self.tts_service.connect()
+        
+        self.logger.info("✅ TTS services ready")
+        
+    def _setup_triggers(self):
+        """Setup trigger system with configured triggers"""
+        from triggers.manager import TriggerManager
+        from triggers.builtin import TestTrigger
+        
+        self.logger.info("🎯 Initializing proactive trigger system...")
+        
+        # Create TTS callback if TTS is available
+        tts_callback = None
+        if self.tts_service and self.audio_output:
+            def tts_callback(text, voice_settings):
+                # Define callbacks for TTS lifecycle
+                def on_tts_start():
+                    # Pause microphone when TTS starts to prevent feedback
+                    self.logger.debug("TTS starting synthesis - pausing microphone")
+                    self.audio_manager.pause_microphone()
+                    
+                def on_tts_complete():
+                    # Wait for actual playback to complete
+                    self.logger.debug("TTS synthesis complete - waiting for playback to finish")
+                    if self.audio_output:
+                        self.audio_output.wait_for_playback_complete(timeout=10.0, expected_text=text)
+                    
+                    # Add hardware latency delay
+                    import time
+                    hardware_delay = TTS_CONFIG.get("hardware_latency_delay", 0.2)
+                    if hardware_delay > 0:
+                        self.logger.debug(f"TTS adding {hardware_delay}s hardware latency delay")
+                        time.sleep(hardware_delay)
+                    
+                    # Resume microphone after playback is truly complete
+                    self.logger.debug("TTS playback complete - resuming microphone")
+                    self.audio_manager.resume_microphone()
+                
+                try:
+                    # Synthesize with lifecycle callbacks
+                    self.tts_service.synthesize(
+                        text=text,
+                        callback=self.audio_output.play_audio,
+                        on_start=on_tts_start,
+                        on_complete=on_tts_complete,
+                        voice=voice_settings.get("voice"),
+                        speed=voice_settings.get("speed")
+                    )
+                except Exception as e:
+                    # Ensure microphone is resumed even if TTS fails
+                    self.logger.error(f"TTS error during synthesis: {e}", exc_info=True)
+                    if hasattr(self.audio_manager, 'is_microphone_paused') and self.audio_manager.is_microphone_paused():
+                        self.logger.debug("TTS resuming microphone after error")
+                        self.audio_manager.resume_microphone()
+        
+        # Create trigger manager
+        trigger_manager = TriggerManager(
+            buffer_duration=TRIGGER_CONFIG.get("buffer_duration_seconds", 60),
+            llm_model=TRIGGER_CONFIG.get("llm_model", "gpt-4.1-nano"),
+            tts_callback=tts_callback,
+            validation_timeout=TRIGGER_CONFIG.get("validation_timeout", 8.0)
+        )
+        
+        # Load enabled triggers
+        enabled_triggers = TRIGGER_CONFIG.get("enabled_triggers", [])
+        
+        if "test" in enabled_triggers:
+            trigger_manager.add_trigger(TestTrigger())
+            self.logger.info("  ✅ TestTrigger loaded and ready")
+            
+        self.logger.info(f"✅ Trigger system ready with {len(trigger_manager.triggers)} triggers")
+        self.logger.info(f"   LLM Model: {TRIGGER_CONFIG.get('llm_model', 'gpt-4.1-nano')}")
+        self.logger.info(f"   Validation Timeout: {TRIGGER_CONFIG.get('validation_timeout', 8.0)}s")
+        return trigger_manager
+        
     def start(self):
         """Start the voice transcriber"""
         colors = DISPLAY_CONFIG["colors"]
@@ -139,6 +238,10 @@ class VoiceTranscriber:
             self.context_manager.start()
             if self.meeting_session_manager:
                 self.meeting_session_manager.start()
+                
+        # Start audio output if available
+        if self.audio_output:
+            self.audio_output.start()
 
         # Register transcriber as audio consumer
         self.audio_manager.add_consumer(self.transcriber.send_audio)
@@ -177,6 +280,12 @@ class VoiceTranscriber:
             print(f"{colors['info']}🧠 Context management enabled with summarization{colors['reset']}")
         if self.context_access:
             print(f"{colors['info']}🌐 Context access servers running (HTTP + WebSocket){colors['reset']}")
+        if self.trigger_manager:
+            print(f"{colors['info']}🎯 Proactive triggers enabled ({len(self.trigger_manager.triggers)} triggers loaded){colors['reset']}")
+            for trigger in self.trigger_manager.triggers:
+                print(f"{colors['info']}   • {trigger.name} (priority: {trigger.priority}){colors['reset']}")
+        if self.tts_service:
+            print(f"{colors['info']}🔊 TTS enabled (voice: {TTS_CONFIG.get('voice', 'nova')}){colors['reset']}")
 
         try:
             while self.running:
@@ -229,6 +338,32 @@ class VoiceTranscriber:
                 self.context_access.stop()
             except Exception as e:
                 self.logger.error(f"Error stopping context access servers: {e}", exc_info=True)
+                
+        # Stop trigger manager
+        if self.trigger_manager:
+            try:
+                self.logger.info("🎯 Shutting down trigger system...")
+                self.trigger_manager.shutdown()
+                self.logger.info("✅ Trigger system shutdown complete")
+            except Exception as e:
+                self.logger.error(f"Error stopping trigger manager: {e}", exc_info=True)
+                
+        # Stop TTS services
+        if self.audio_output:
+            try:
+                self.logger.info("🔊 Stopping audio output...")
+                self.audio_output.stop()
+                self.logger.info("✅ Audio output stopped")
+            except Exception as e:
+                self.logger.error(f"Error stopping audio output: {e}", exc_info=True)
+                
+        if self.tts_service:
+            try:
+                self.logger.info("🔊 Disconnecting TTS service...")
+                self.tts_service.disconnect()
+                self.logger.info("✅ TTS service disconnected")
+            except Exception as e:
+                self.logger.error(f"Error disconnecting TTS service: {e}", exc_info=True)
 
         # Stop audio stream
         try:
