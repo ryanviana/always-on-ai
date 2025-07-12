@@ -208,9 +208,16 @@ CONVERSATION_CONFIG = {
     ]
 }
 
-# Simplified context management - disabled for transcription-only mode
+# Context management configuration
 CONTEXT_CONFIG = {
-    "enabled": False
+    "enabled": True,
+    "raw_window_minutes": 5,  # Minutes to keep in raw format
+    "summarization_model": "gpt-4.1-nano",  # Cost-efficient model for summarization
+    "summarization_interval": 60,  # Seconds between summarization attempts
+    "persistence_enabled": True,  # Enable context persistence to disk
+    "persistence_interval": 60,  # Seconds between auto-saves
+    "persistence_dir": "./context_storage",  # Directory for context files
+    "max_persistence_files": 10  # Maximum number of context files to keep
 }
 
 # Connection timeout for transcription
