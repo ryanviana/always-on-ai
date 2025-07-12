@@ -7,36 +7,35 @@ import threading
 import time
 import uuid
 from typing import List, Dict, Any, Optional, Callable, Tuple
-from concurrent.futures import ThreadPoolExecutor, Future, wait, as_completed
+from concurrent.futures import ThreadPoolExecutor, Future, wait
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 from queue import Queue, Empty
-import sys
-import os
-
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from events import event_bus, EventTypes
-from security import InputSanitizer, InputValidationError
-from logging_config import get_logger
 
 from .buffer import TranscriptionBuffer
 from .base import BaseTrigger
+from .models import RequestContext, ValidationResult, DEFAULT_VALIDATION_TIMEOUT, DEFAULT_BUFFER_DURATION, DEFAULT_LLM_MODEL, DEFAULT_MAX_WORKERS
+from .utils import setup_trigger_logger
+
+# Import from project root
+from events import event_bus, EventTypes
+from security import InputSanitizer, InputValidationError
 from config import TTS_CONFIG
 
 
 class TriggerManager:
     """Manages triggers and processes transcriptions through two-stage pipeline"""
     
-    def __init__(self, buffer_duration: int = 60, llm_model: str = "gpt-4o-mini", 
+    def __init__(self, buffer_duration: int = DEFAULT_BUFFER_DURATION, 
+                 llm_model: str = DEFAULT_LLM_MODEL, 
                  tts_callback: Optional[Callable[[str, Dict[str, Any]], None]] = None,
-                 validation_timeout: float = 8.0):
-        self.logger = get_logger(__name__)
+                 validation_timeout: float = DEFAULT_VALIDATION_TIMEOUT):
+        self.logger = setup_trigger_logger("TriggerManager")
         self.buffer = TranscriptionBuffer(duration_seconds=buffer_duration)
         self.triggers: List[BaseTrigger] = []
         self.llm_model = llm_model
         self.validation_timeout = validation_timeout
-        self.executor = ThreadPoolExecutor(max_workers=3)
+        self.executor = ThreadPoolExecutor(max_workers=DEFAULT_MAX_WORKERS)
         self._validation_tasks = []
         self.tts_callback = tts_callback  # Callback for TTS synthesis
         
@@ -58,7 +57,7 @@ class TriggerManager:
     def add_trigger(self, trigger: BaseTrigger):
         """Add a trigger to the manager"""
         self.triggers.append(trigger)
-        print(f"Added trigger: {trigger}")
+        self.logger.info(f"Added trigger: {trigger}")
         
     def remove_trigger(self, trigger_name: str):
         """Remove a trigger by name"""
