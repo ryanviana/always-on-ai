@@ -137,6 +137,7 @@ DEFAULT_CONVERSATION_VAD = VAD_CONFIG["semantic_vad"]  # Default for conversatio
 API_ENDPOINTS = {
     "realtime": "wss://api.openai.com/v1/realtime",
     "transcription": "wss://api.openai.com/v1/realtime?intent=transcription",
+    "conversation": "wss://api.openai.com/v1/realtime",
 }
 
 # Noise reduction settings
@@ -214,6 +215,23 @@ def get_conversation_session_config(model=None, vad_config=None, voice="verse"):
     }
 
 
+def get_assistant_session_config(instructions=None, model=None, voice=None, vad_config=None):
+    """Get assistant mode session configuration for speech-to-speech conversations"""
+    config = ASSISTANT_MODE_CONFIG
+    return {
+        "type": "session.update",
+        "session": {
+            "model": model or config["conversation_model"],
+            "voice": voice or config["voice"],
+            "instructions": instructions or config["instructions"],
+            "turn_detection": vad_config or DEFAULT_CONVERSATION_VAD,
+            "input_audio_format": AUDIO_CONFIG["input_format"],
+            "output_audio_format": AUDIO_CONFIG["input_format"],
+            "modalities": ["text", "audio"],
+        },
+    }
+
+
 # Transcription-only configuration - no triggers or TTS
 TRANSCRIPTION_ONLY = True
 
@@ -278,6 +296,30 @@ TTS_CONFIG = {
     "output_sample_rate": 24000,  # Sample rate for TTS output
     "playback_chunk_size": 2048,  # Chunk size for audio playback
     "hardware_latency_delay": 0.2,  # Hardware latency delay in seconds
+}
+
+# Assistant Mode (Speech-to-Speech) configuration
+ASSISTANT_MODE_CONFIG = {
+    "enabled": True,  # Enable/disable Assistant Mode
+    "conversation_model": DEFAULT_CONVERSATION_MODEL,  # Model for conversation mode
+    "voice": "verse",  # Voice for assistant responses (alloy, ash, ballad, coral, echo, sage, shimmer, verse)
+    "instructions": "Você é um assistente de voz em português brasileiro. Seja útil, conciso e natural nas suas respostas. Mantenha o contexto da conversa anterior.",
+    "session_timeout": 300,  # Maximum conversation duration in seconds (5 minutes)
+    "idle_timeout": 30,  # Timeout for silence before ending conversation (seconds)
+    "context_injection": True,  # Inject conversation context into assistant session
+    "max_context_length": 2000,  # Maximum characters from context to inject
+    "wake_phrases": [
+        # Portuguese phrases
+        "assistente", "ei assistente", "olá assistente", "hey assistente",
+        # English phrases  
+        "assistant", "hey assistant", "hello assistant",
+    ],
+    "end_phrases": [
+        # Portuguese phrases
+        "tchau", "até logo", "obrigado", "obrigada", "fim", "terminar", "parar",
+        # English phrases
+        "bye", "goodbye", "thanks", "thank you", "stop", "end", "finish",
+    ],
 }
 
 # Connection timeout for transcription
