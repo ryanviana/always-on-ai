@@ -354,6 +354,19 @@ class TriggerManager:
                 response_text = response.get("text")
                 should_speak = response.get("speak", True)
                 voice_settings = response.get("voice_settings", {})
+                action_type = response.get("action_type")
+                conversation_data = response.get("conversation_data")
+                
+                # Handle special conversation action
+                if action_type == "start_conversation" and self.tts_callback:
+                    self.logger.info(f"🗣️ CONVERSATION ACTION: Starting Assistant Mode")
+                    try:
+                        # Call TTS callback with conversation action parameters
+                        self.tts_callback(None, {}, action_type, conversation_data)
+                        self.logger.info(f"✅ CONVERSATION: Assistant Mode started")
+                    except Exception as e:
+                        self.logger.error(f"❌ CONVERSATION: Failed to start Assistant Mode: {e}", exc_info=True)
+                    return
                 
                 if response_text:
                     self.logger.info(f"📝 RESPONSE: {response_text}")
