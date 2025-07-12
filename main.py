@@ -11,12 +11,14 @@ from audio_stream import AudioStreamManager
 from transcription.simple_transcriber import RealtimeTranscriber
 from config import (
     DISPLAY_CONFIG, CONVERSATION_CONFIG, CONTEXT_CONFIG, LOGGING_CONFIG, CONNECTION_TIMEOUT,
-    TRIGGER_CONFIG, TTS_CONFIG
+    TRIGGER_CONFIG, TTS_CONFIG, ASSISTANT_MODE_CONFIG
 )
 from logging_config import setup_logging, get_logger
 from context import EnhancedContextManager, ContextPersistence, setup_context_access, MeetingSessionManager
 from datetime import datetime
 from triggers import TriggerManager
+from conversation.realtime_conversation import RealtimeConversationManager
+from audio.conversation_handler import ConversationAudioHandler
 
 
 class VoiceTranscriber:
@@ -56,6 +58,13 @@ class VoiceTranscriber:
             speech_stopped_callback=None,
             use_conversation_manager=CONVERSATION_CONFIG.get("enabled", False),
         )
+        
+        # Initialize Assistant Mode components
+        self.conversation_manager = None
+        self.conversation_audio_handler = None
+        if ASSISTANT_MODE_CONFIG.get("enabled", False):
+            self.conversation_manager = self._setup_conversation_manager()
+            self.conversation_audio_handler = self._setup_conversation_audio_handler()
         
         # Hook conversation manager to context manager
         if self.context_manager:
@@ -159,14 +168,20 @@ class VoiceTranscriber:
     def _setup_triggers(self):
         """Setup trigger system with configured triggers"""
         from triggers.manager import TriggerManager
-        from triggers.builtin import TestTrigger
+        from triggers.builtin import TestTrigger, AssistantTrigger
         
         self.logger.info("🎯 Initializing proactive trigger system...")
         
-        # Create TTS callback if TTS is available
+        # Create enhanced TTS callback that handles both TTS and conversation actions
         tts_callback = None
         if self.tts_service and self.audio_output:
-            def tts_callback(text, voice_settings):
+            def tts_callback(text, voice_settings, action_type=None, conversation_data=None):
+                # Handle special conversation action
+                if action_type == "start_conversation":
+                    self._handle_conversation_action(conversation_data)
+                    return
+                    
+                # Regular TTS handling
                 # Define callbacks for TTS lifecycle
                 def on_tts_start():
                     # Pause microphone when TTS starts to prevent feedback
@@ -222,10 +237,80 @@ class VoiceTranscriber:
             trigger_manager.add_trigger(TestTrigger())
             self.logger.info("  ✅ TestTrigger loaded and ready")
             
+        # Always load AssistantTrigger if Assistant Mode is enabled
+        if ASSISTANT_MODE_CONFIG.get("enabled", False):
+            trigger_manager.add_trigger(AssistantTrigger())
+            self.logger.info("  ✅ AssistantTrigger loaded and ready")
+            
         self.logger.info(f"✅ Trigger system ready with {len(trigger_manager.triggers)} triggers")
         self.logger.info(f"   LLM Model: {TRIGGER_CONFIG.get('llm_model', 'gpt-4.1-nano')}")
         self.logger.info(f"   Validation Timeout: {TRIGGER_CONFIG.get('validation_timeout', 8.0)}s")
         return trigger_manager
+        
+    def _setup_conversation_manager(self):
+        """Setup conversation manager for Assistant Mode"""
+        self.logger.info("🗣️ Initializing Assistant Mode conversation manager...")
+        
+        def on_conversation_ended():
+            """Callback when conversation ends"""
+            if self.conversation_audio_handler:
+                self.conversation_audio_handler.stop_conversation_mode()
+                
+        conversation_manager = RealtimeConversationManager(
+            conversation_ended_callback=on_conversation_ended
+        )
+        
+        self.logger.info("✅ Assistant Mode conversation manager ready")
+        return conversation_manager
+        
+    def _setup_conversation_audio_handler(self):
+        """Setup conversation audio handler"""
+        if not self.conversation_manager:
+            self.logger.warning("Cannot setup conversation audio handler without conversation manager")
+            return None
+            
+        self.logger.info("🎵 Initializing conversation audio handler...")
+        
+        audio_handler = ConversationAudioHandler(
+            audio_stream_manager=self.audio_manager,
+            transcriber=self.transcriber
+        )
+        
+        self.logger.info("✅ Conversation audio handler ready")
+        return audio_handler
+        
+    def _handle_conversation_action(self, conversation_data):
+        """Handle the conversation action from AssistantTrigger"""
+        if not self.conversation_manager or not self.conversation_audio_handler:
+            self.logger.error("Conversation components not available")
+            return
+            
+        try:
+            wake_phrase = conversation_data.get("wake_phrase", "assistente")
+            self.logger.info(f"🎯 Starting conversation from trigger: {wake_phrase}")
+            
+            # Get context from context manager
+            context = None
+            if self.context_manager and ASSISTANT_MODE_CONFIG.get("context_injection", True):
+                # Get recent context
+                max_length = ASSISTANT_MODE_CONFIG.get("max_context_length", 2000)
+                context = self.context_manager.get_summarized_context()
+                if context and len(context) > max_length:
+                    context = context[-max_length:]  # Truncate if too long
+                    
+            # Switch to conversation mode
+            if self.conversation_audio_handler.start_conversation_mode(self.conversation_manager):
+                # Start the conversation session
+                if self.conversation_manager.start_conversation(context=context, wake_phrase=wake_phrase):
+                    self.logger.info("✅ Assistant Mode conversation started successfully")
+                else:
+                    self.logger.error("Failed to start conversation session")
+                    self.conversation_audio_handler.stop_conversation_mode()
+            else:
+                self.logger.error("Failed to switch to conversation mode")
+                
+        except Exception as e:
+            self.logger.error(f"Error handling conversation action: {e}", exc_info=True)
         
     def start(self):
         """Start the voice transcriber"""
@@ -288,6 +373,8 @@ class VoiceTranscriber:
                 print(f"{colors['info']}   • {trigger.name} (priority: {trigger.priority}){colors['reset']}")
         if self.tts_service:
             print(f"{colors['info']}🔊 TTS enabled (voice: {TTS_CONFIG.get('voice', 'nova')}){colors['reset']}")
+        if self.conversation_manager and self.conversation_audio_handler:
+            print(f"{colors['info']}🗣️ Assistant Mode enabled (voice: {ASSISTANT_MODE_CONFIG.get('voice', 'verse')}){colors['reset']}")
 
         try:
             while self.running:
@@ -349,6 +436,23 @@ class VoiceTranscriber:
                 self.logger.info("✅ Trigger system shutdown complete")
             except Exception as e:
                 self.logger.error(f"Error stopping trigger manager: {e}", exc_info=True)
+                
+        # Stop conversation components
+        if self.conversation_manager:
+            try:
+                self.logger.info("🗣️ Stopping conversation manager...")
+                self.conversation_manager.stop_conversation("system_shutdown")
+                self.logger.info("✅ Conversation manager stopped")
+            except Exception as e:
+                self.logger.error(f"Error stopping conversation manager: {e}", exc_info=True)
+                
+        if self.conversation_audio_handler:
+            try:
+                self.logger.info("🎵 Stopping conversation audio handler...")
+                self.conversation_audio_handler.stop_conversation_mode()
+                self.logger.info("✅ Conversation audio handler stopped")
+            except Exception as e:
+                self.logger.error(f"Error stopping conversation audio handler: {e}", exc_info=True)
                 
         # Stop TTS services
         if self.audio_output:
