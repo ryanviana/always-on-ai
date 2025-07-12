@@ -177,3 +177,10 @@ class EventTypes:
     TRIGGER_EXECUTION_START = "trigger.execution_start"
     TRIGGER_EXECUTION_COMPLETE = "trigger.execution_complete"
     TRIGGER_EXECUTION_ERROR = "trigger.execution_error"
+    
+    # Conversation events (Assistant Mode)
+    CONVERSATION_START = "conversation.start"
+    CONVERSATION_END = "conversation.end"
+    CONVERSATION_AUDIO_INPUT = "conversation.audio_input"
+    CONVERSATION_AUDIO_OUTPUT = "conversation.audio_output"
+    CONVERSATION_ERROR = "conversation.error"
