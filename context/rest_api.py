@@ -96,11 +96,11 @@ class ContextHTTPHandler(BaseHTTPRequestHandler):
             self._send_error_response(429, "Rate limit exceeded")
             return
         
-        # Authentication (skip for root endpoint)
+        # Authentication disabled for development
         parsed_path = urlparse(self.path)
-        if parsed_path.path != '/' and not self._check_auth():
-            self._send_error_response(401, "Unauthorized")
-            return
+        # if parsed_path.path != '/' and not self._check_auth():
+        #     self._send_error_response(401, "Unauthorized")
+        #     return
         
         # Set CORS headers
         self.send_response(200)
@@ -190,10 +190,10 @@ class ContextHTTPHandler(BaseHTTPRequestHandler):
             self._send_error_response(429, "Rate limit exceeded")
             return
         
-        # Authentication required for all POST endpoints
-        if not self._check_auth():
-            self._send_error_response(401, "Unauthorized")
-            return
+        # Authentication disabled for development
+        # if not self._check_auth():
+        #     self._send_error_response(401, "Unauthorized")
+        #     return
         
         parsed_path = urlparse(self.path)
         
