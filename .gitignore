@@ -284,3 +284,4 @@ context_storage/
 context/*.json.gz
 # API Security
 context/.api_key
+package-lock.json
