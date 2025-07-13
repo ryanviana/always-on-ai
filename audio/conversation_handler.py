@@ -6,7 +6,7 @@ Conversation Audio Handler - Manages audio routing for conversation mode
 import threading
 import time
 from typing import Optional, Callable, List
-from logging_config import get_logger
+from core.logging_config import get_logger
 from events import event_bus, EventTypes
 from config import DISPLAY_CONFIG
 

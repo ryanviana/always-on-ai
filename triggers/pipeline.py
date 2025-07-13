@@ -13,7 +13,7 @@ from .executor import TriggerExecutor
 from .request_queue import RequestQueue, TriggerRequest
 from .models import ValidationResult, DEFAULT_BUFFER_DURATION, DEFAULT_LLM_MODEL, DEFAULT_VALIDATION_TIMEOUT
 from .utils import setup_trigger_logger
-from security import InputSanitizer, InputValidationError
+from core.security import InputSanitizer, InputValidationError
 from events import event_bus, EventTypes
 
 

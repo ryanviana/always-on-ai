@@ -67,7 +67,7 @@ def setup_trigger_logger(name: str) -> logging.Logger:
         Configured logger
     """
     try:
-        from logging_config import get_logger
+        from core.logging_config import get_logger
         return get_logger(name)
     except ImportError:
         # Fallback to basic logger if logging_config not available

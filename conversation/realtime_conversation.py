@@ -21,7 +21,7 @@ from config import (
     DISPLAY_CONFIG,
     get_assistant_session_config
 )
-from logging_config import get_logger
+from core.logging_config import get_logger
 from events import event_bus, EventTypes
 
 # Load environment variables

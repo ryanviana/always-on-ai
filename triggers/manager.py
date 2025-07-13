@@ -17,8 +17,8 @@ import os
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from events import event_bus, EventTypes
-from security import InputSanitizer, InputValidationError
-from logging_config import get_logger
+from core.security import InputSanitizer, InputValidationError
+from core.logging_config import get_logger
 
 from .buffer import TranscriptionBuffer
 from .base import BaseTrigger

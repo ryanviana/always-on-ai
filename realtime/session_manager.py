@@ -16,7 +16,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import VAD_CONFIG, AUDIO_DEVICE_CONFIG, DEFAULT_CONVERSATION_VAD
 from events import event_bus, EventTypes
-from logging_config import get_logger
+from core.logging_config import get_logger
 from .tool_execution_manager import ToolExecutionManager
 from .tools.registry import ToolRegistry
 

@@ -7,14 +7,14 @@ import signal
 import sys
 import threading
 import time
-from audio_stream import AudioStreamManager
+from audio.audio_stream import AudioStreamManager
 from transcription.simple_transcriber import RealtimeTranscriber
 from config import (
     DISPLAY_CONFIG, TRIGGER_CONFIG, CONVERSATION_CONFIG,
     CONTEXT_CONFIG, ASSISTANT_CONFIG, TTS_CONFIG, AUDIO_DEVICE_CONFIG, LOGGING_CONFIG, REALTIME_CONFIG
 )
-from logging_config import setup_logging, get_logger
-from config_validator import validate_startup_config, ConfigValidationError
+from core.logging_config import setup_logging, get_logger
+from core.config_validator import validate_startup_config, ConfigValidationError
 from triggers import TriggerManager
 from triggers.builtin import TestTrigger, AssistantTrigger, RevenueVerificationTrigger
 from context import EnhancedContextManager, ContextPersistence, setup_context_access
