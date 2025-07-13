@@ -32,10 +32,6 @@ const VoiceOrb: React.FC<VoiceOrbProps> = ({ events }) => {
   const pulsePhaseRef = useRef(0);
   const floatPhaseRef = useRef(0);
   
-  // Debug - set to true to see detailed state info
-  const [debug] = useState(true);
-  const [lastHideReason, setLastHideReason] = useState<string>('');
-  
   // Smooth animation loop
   useEffect(() => {
     const animate = () => {
@@ -142,68 +138,30 @@ const VoiceOrb: React.FC<VoiceOrbProps> = ({ events }) => {
         
         console.log(`[VoiceOrb] 📥 Processing session end event: session=${event.data.session_id}, reason=${event.data?.reason}, current=${currentSessionId}, state=${orbState}`);
         
-        // Create unique event ID to prevent duplicate processing
-        const eventId = `${event.data.session_id}-${event.data?.reason}-${event.timestamp}`;
-        if (processedSessionEndsRef.current.has(eventId)) {
-          console.log(`[VoiceOrb] 🔄 Skipping duplicate session end event: ${eventId}`);
-          continue; // FIX: Use continue instead of return to process other events
+        // Simple approach: hide the orb when session ends
+        console.log(`[VoiceOrb] 🔴 Session ending: ${event.data.session_id} (reason: ${event.data?.reason})`);
+        setOrbState(OrbState.SESSION_ENDING);
+        
+        // Hide after 2 seconds
+        console.log(`[VoiceOrb] ⏱️ Setting hide timer for 2 seconds...`);
+        if (hideTimerRef.current) {
+          clearTimeout(hideTimerRef.current);
         }
-        processedSessionEndsRef.current.add(eventId);
-        
-        // Check if this is a valid goodbye-triggered end
-        const endReason = event.data?.reason || 'unknown';
-        const validGoodbyeReasons = ['user_goodbye', 'assistant_goodbye', 'goodbye_timeout'];
-        const isGoodbyeEnd = validGoodbyeReasons.includes(endReason);
-        
-        // Also validate session timing - ignore events from very old sessions
-        const sessionInfo = sessionValidationRef.current;
-        const now = Date.now();
-        const sessionAge = sessionInfo ? now - sessionInfo.timestamp : 0;
-        const eventTimestamp = event.timestamp || 0;
-        const eventAge = now - eventTimestamp;
-        console.log(`[VoiceOrb] ⏱️ Event timing: now=${now}, eventTimestamp=${eventTimestamp}, eventAge=${eventAge}ms`);
-        
-        // Additional validation: ignore stale events (older than 30 seconds)
-        if (eventAge > 30000) {
-          console.log(`[VoiceOrb] 🕐 Ignoring stale session end event: ${event.data.session_id} (event age: ${eventAge}ms)`);
-          continue; // FIX: Use continue instead of return to process other events
-        }
-        
-        // Only hide orb if it's a goodbye-triggered end AND the session is reasonably fresh
-        if (isGoodbyeEnd && sessionAge < 300000) { // 5 minute max session age check
-          console.log(`[VoiceOrb] 🔴 Session ending due to goodbye: ${event.data.session_id} (reason: ${endReason}, session age: ${sessionAge}ms, event age: ${eventAge}ms)`);
-          setOrbState(OrbState.SESSION_ENDING);
-          
-          // Hide after 3 seconds
-          console.log(`[VoiceOrb] ⏱️ Setting hide timer for 3 seconds...`);
-          hideTimerRef.current = setTimeout(() => {
-            console.log('[VoiceOrb] ⏰ Timer fired! Hiding orb after goodbye');
-            // Use setState callback to get current state
-            setOrbState((currentOrbState) => {
-              console.log(`[VoiceOrb] Current state in timer: orbState=${currentOrbState}`);
-              return OrbState.IDLE;
-            });
-            setCurrentSessionId((currentId) => {
-              console.log(`[VoiceOrb] Current sessionId in timer: ${currentId}`);
-              return null;
-            });
-            setLastHideReason(`Goodbye detected: ${endReason}`);
-            targetLevelRef.current = 0;
-            sessionValidationRef.current = null;
-            processedSessionEndsRef.current.clear();
-            console.log('[VoiceOrb] ✅ Hide complete - orb should be gone');
-          }, 3000);
-        } else {
-          const rejectReason = !isGoodbyeEnd ? 'non-goodbye reason' : 'session too old';
-          console.log(`[VoiceOrb] ⚠️ Ignoring session end: ${event.data.session_id} (${rejectReason}, reason: ${endReason}, session age: ${sessionAge}ms, event age: ${eventAge}ms)`);
-          console.log(`[VoiceOrb] Orb will remain visible until valid goodbye is detected`);
-        }
+        hideTimerRef.current = setTimeout(() => {
+          console.log('[VoiceOrb] ⏰ Timer fired! Hiding orb');
+          setOrbState(OrbState.IDLE);
+          setCurrentSessionId(null);
+          targetLevelRef.current = 0;
+          sessionValidationRef.current = null;
+          processedSessionEndsRef.current.clear();
+          console.log('[VoiceOrb] ✅ Hide complete - orb should be gone');
+        }, 2000);
         } else {
           console.log(`[VoiceOrb] ⚠️ Session end event doesn't match current session or state`);
         }
       }
       
-      // Audio levels - only from realtime assistant, only during active session
+      // Audio levels - only from realtime assistant, during active session
       else if (event.type === 'audio.output_level' && 
                event.data?.source === 'realtime_assistant' &&
                event.data?.is_playing &&
@@ -291,37 +249,7 @@ const VoiceOrb: React.FC<VoiceOrbProps> = ({ events }) => {
           {/* Glass effect */}
           <div className="absolute inset-0 rounded-full bg-gradient-to-br from-transparent via-white/10 to-transparent" />
         </div>
-        
-        {/* Status */}
-        <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 text-center">
-          <div className={`text-sm font-medium transition-all duration-500 ${
-            orbState === OrbState.SESSION_ENDING ? 'text-gray-400' : 'text-blue-400'
-          }`}>
-            {orbState === OrbState.SESSION_ENDING ? 'Session Ending...' : 'Assistant Active'}
-          </div>
-          
-          {debug && (
-            <div className="text-xs text-gray-500 mt-2 space-y-1">
-              <div>State: {orbState}</div>
-              <div>Audio: {Math.round(audioLevel * 100)}%</div>
-              <div>Session: {currentSessionId ? currentSessionId.slice(-8) : 'none'}</div>
-              {sessionValidationRef.current && (
-                <div>Age: {Math.round((Date.now() - sessionValidationRef.current.timestamp) / 1000)}s</div>
-              )}
-              {lastHideReason && (
-                <div className="text-red-400">Last hide: {lastHideReason}</div>
-              )}
-            </div>
-          )}
-        </div>
       </div>
-      
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-10px); }
-        }
-      `}</style>
     </div>
   );
 };
