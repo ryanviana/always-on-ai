@@ -23,6 +23,13 @@ if ! command -v npm &> /dev/null; then
     exit 1
 fi
 
+# Get the script directory and project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+# Change to project root
+cd "$PROJECT_ROOT"
+
 # Check if dashboard dependencies are installed
 if [ ! -d "dashboard/node_modules" ]; then
     echo "📦 Installing dashboard dependencies..."

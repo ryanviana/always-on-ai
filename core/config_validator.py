@@ -206,7 +206,7 @@ class ConfigValidator:
     def _validate_security_config(self):
         """Validate security configuration and settings"""
         try:
-            from security import validate_production_security, APIKeyValidator
+            from .security import validate_production_security, APIKeyValidator
             
             # Run comprehensive security validation
             security_results = validate_production_security()

@@ -8,7 +8,7 @@ import base64
 import pyaudio
 from config import AUDIO_CONFIG, DISPLAY_CONFIG
 from events import event_bus, EventTypes
-from logging_config import get_logger
+from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
