@@ -1,4 +1,4 @@
-# 🧠 Always On AI
+# Always On AI
 
 ## 🧐 O que é?
 
