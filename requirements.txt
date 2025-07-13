@@ -1,6 +1,14 @@
-websocket-client==1.7.0
-python-dotenv==1.0.0
-pyaudio==0.2.14
-openai>=1.70.0
-websockets>=12.0
+# Core dependencies for Assistant trigger and Realtime API
+openai>=1.12.0
 jinja2>=3.1.2
+python-dotenv>=1.0.0
+websockets>=11.0
+websocket-client>=1.6.0
+asyncio>=3.4.3
+numpy>=1.24.0
+pyaudio>=0.2.13
+pytz>=2023.3
+aiohttp>=3.8.0
+sounddevice>=0.4.6
+scipy>=1.10.0
+google-api-python-client>=2.0.0
