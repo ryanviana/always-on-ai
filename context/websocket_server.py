@@ -23,6 +23,7 @@ class ContextWebSocketServer:
         self.context_manager = context_manager
         self.port = port
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
+        self.clients_lock = threading.Lock()  # Thread safety for client set
         self.server = None
         self.loop = None
         self.thread = None
@@ -32,9 +33,11 @@ class ContextWebSocketServer:
         
     async def handle_client(self, websocket, path=None):
         """Handle a WebSocket client connection"""
-        # Register client
-        self.clients.add(websocket)
-        logger.info(f"Client connected: {websocket.remote_address} (Total: {len(self.clients)})")
+        # Register client with thread safety
+        with self.clients_lock:
+            self.clients.add(websocket)
+            client_count = len(self.clients)
+        logger.info(f"Client connected: {websocket.remote_address} (Total: {client_count})")
         
         try:
             # Send initial context
@@ -85,20 +88,27 @@ class ContextWebSocketServer:
                             "type": "event_stats_response",
                             "data": stats
                         }))
+                except json.JSONDecodeError as e:
+                    logger.error(f"Invalid JSON from client: {e}")
                 except Exception as e:
-                    logger.error(f"Error handling message: {e}")
+                    logger.error(f"Error handling message: {e}", exc_info=True)
                     
         except websockets.exceptions.ConnectionClosed:
             pass
         finally:
-            # Unregister client
-            self.clients.remove(websocket)
-            logger.info(f"Client disconnected (Total: {len(self.clients)})")
+            # Unregister client with thread safety
+            with self.clients_lock:
+                self.clients.discard(websocket)
+                client_count = len(self.clients)
+            logger.info(f"Client disconnected (Total: {client_count})")
             
     async def broadcast_update(self):
         """Broadcast context update to all clients"""
-        if not self.clients:
-            return
+        # Get a snapshot of clients with thread safety
+        with self.clients_lock:
+            if not self.clients:
+                return
+            clients_snapshot = list(self.clients)
             
         context = self.context_manager.get_full_context()
         message = json.dumps({
@@ -108,15 +118,17 @@ class ContextWebSocketServer:
         
         # Send to all clients
         disconnected = []
-        for client in list(self.clients):
+        for client in clients_snapshot:
             try:
                 await client.send(message)
             except (websockets.ConnectionClosed, websockets.InvalidState, OSError) as e:
                 disconnected.append(client)
                 
-        # Remove disconnected clients
-        for client in disconnected:
-            self.clients.remove(client)
+        # Remove disconnected clients with thread safety
+        if disconnected:
+            with self.clients_lock:
+                for client in disconnected:
+                    self.clients.discard(client)
             
     async def start_server(self):
         """Start the WebSocket server"""
@@ -180,21 +192,20 @@ class ContextWebSocketServer:
     
     async def _shutdown_server(self):
         """Gracefully shutdown the WebSocket server"""
-        # Close all client connections
-        if self.clients:
-            logger.info(f"Closing {len(self.clients)} client connections")
-            disconnected = []
-            for client in list(self.clients):
-                try:
-                    await client.close()
-                    disconnected.append(client)
-                except Exception as e:
-                    logger.warning(f"Error closing client connection: {e}")
-                    disconnected.append(client)
-            
-            # Remove disconnected clients
-            for client in disconnected:
-                self.clients.discard(client)
+        # Close all client connections with thread safety
+        clients_to_close = []
+        with self.clients_lock:
+            if self.clients:
+                logger.info(f"Closing {len(self.clients)} client connections")
+                clients_to_close = list(self.clients)
+                self.clients.clear()  # Clear all clients at once
+        
+        # Close connections outside the lock to avoid blocking
+        for client in clients_to_close:
+            try:
+                await client.close()
+            except Exception as e:
+                logger.warning(f"Error closing client connection: {e}")
         
         # Stop the event loop
         self.loop.stop()
@@ -214,8 +225,11 @@ class ContextWebSocketServer:
     
     async def _broadcast_event(self, event: SystemEvent):
         """Broadcast event to all connected clients"""
-        if not self.clients:
-            return
+        # Get a snapshot of clients with thread safety
+        with self.clients_lock:
+            if not self.clients:
+                return
+            clients_snapshot = list(self.clients)
             
         # Convert event to dict for JSON serialization
         message = json.dumps({
@@ -225,12 +239,14 @@ class ContextWebSocketServer:
         
         # Send to all clients
         disconnected = []
-        for client in list(self.clients):
+        for client in clients_snapshot:
             try:
                 await client.send(message)
             except (websockets.ConnectionClosed, websockets.InvalidState, OSError):
                 disconnected.append(client)
                 
-        # Remove disconnected clients
-        for client in disconnected:
-            self.clients.discard(client)
+        # Remove disconnected clients with thread safety
+        if disconnected:
+            with self.clients_lock:
+                for client in disconnected:
+                    self.clients.discard(client)

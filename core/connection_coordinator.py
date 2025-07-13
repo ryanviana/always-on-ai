@@ -114,7 +114,10 @@ class ConnectionCoordinator:
             # This prevents trace trap from audio being sent to closed WebSocket
             if self.transcriber and hasattr(self.transcriber, 'send_audio'):
                 print("Removing transcriber audio consumer...")
-                self.audio_manager.remove_consumer(self.transcriber.send_audio)
+                try:
+                    self.audio_manager.remove_consumer(self.transcriber.send_audio)
+                except Exception as e:
+                    print(f"Warning: Error removing transcriber consumer: {e}")
                 # Give a moment for any in-flight audio to complete
                 time.sleep(0.1)
             
