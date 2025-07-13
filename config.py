@@ -7,13 +7,13 @@ import os
 # OpenAI Models
 TRANSCRIPTION_MODELS = {
     "gpt-4o-transcribe": "gpt-4o-transcribe",
-    "gpt-4o-mini-transcribe": "gpt-4o-mini-transcribe",
-    "whisper-1": "whisper-1",
+    "gpt-4o-mini-transcribe": "gpt-4o-mini-transcribe", 
+    "whisper-1": "whisper-1"
 }
 
 CONVERSATION_MODELS = {
     "gpt-4o-realtime": "gpt-4o-realtime-preview-2025-06-03",
-    "gpt-4o-mini-realtime": "gpt-4o-mini-realtime-preview-2024-12-17",
+    "gpt-4o-mini-realtime": "gpt-4o-mini-realtime-preview-2024-12-17"
 }
 
 # Default model selections
@@ -21,24 +21,6 @@ DEFAULT_TRANSCRIPTION_MODEL = TRANSCRIPTION_MODELS["gpt-4o-transcribe"]
 DEFAULT_CONVERSATION_MODEL = CONVERSATION_MODELS["gpt-4o-realtime"]
 
 # Language settings
-SUPPORTED_LANGUAGES = {
-    "portuguese": "pt",  # Portuguese language code
-    "english": "en",
-    "spanish": "es",
-    "french": "fr",
-    "german": "de",
-    "italian": "it",
-    "japanese": "ja",
-    "korean": "ko",
-    "chinese": "zh",
-    "russian": "ru",
-    "dutch": "nl",
-    "polish": "pl",
-    "turkish": "tr",
-    "arabic": "ar",
-    "hindi": "hi",
-}
-
 DEFAULT_LANGUAGE = "pt"  # Portuguese (includes Brazilian Portuguese)
 
 # Audio settings
@@ -46,7 +28,7 @@ AUDIO_CONFIG = {
     "sample_rate": 16000,
     "channels": 1,
     "chunk_size": 1024,
-    "input_format": "pcm16",
+    "input_format": "pcm16"
 }
 
 # Audio device detection and feedback prevention settings
@@ -55,64 +37,14 @@ AUDIO_DEVICE_CONFIG = {
     "manual_override": None,  # "speakers", "headphones", or None
     "speaker_feedback_prevention": "aggressive",  # "aggressive", "moderate", "off"
     "headphone_interruption_enabled": True,
+    
     # Echo prevention timing settings (in seconds)
     "speaker_echo_delay": {
-        "min_silence_time": 1.0,  # Minimum silence before resuming input
-        "dead_zone_duration": 0.5,  # Ignore input for this duration after resume
-        "max_wait_time": 30.0,  # Maximum time to wait for safe conditions before forcing resume
-        "check_interval": 0.2,  # How often to check if safe to resume
-    },
-    "headphone_patterns": [
-        r"headphone",
-        r"airpods",
-        r"beats",
-        r"bose",
-        r"sony",
-        r"audio-technica",
-        r"sennheiser",
-        r"jabra",
-        r"plantronics",
-        r"skull",
-        r"jbl",
-        r"marshall",
-        r"earbuds",
-        r"earphones",
-        r"in-ear",
-        r"on-ear",
-        r"over-ear",
-        r"bluetooth",
-        r"wireless",
-        r"wh-",
-        r"wf-",
-        r"momentum",
-        r"hd ",
-        r"dt ",
-        r"mdm",
-        r"qc",
-        r"quietcomfort",
-        r"noise.?cancel",
-        r"anc",
-    ],
-    "speaker_patterns": [
-        r"speaker",
-        r"monitor",
-        r"studio",
-        r"desktop",
-        r"built.?in",
-        r"internal",
-        r"system",
-        r"default",
-        r"macbook",
-        r"imac",
-        r"soundbar",
-        r"subwoofer",
-        r"satellite",
-        r"bookshelf",
-        r"tower",
-        r"amplifier",
-        r"receiver",
-        r"stereo",
-    ],
+        "min_silence_time": 1.0,      # Minimum silence before resuming input
+        "dead_zone_duration": 0.5,    # Ignore input for this duration after resume
+        "max_wait_time": 30.0,        # Maximum time to wait for safe conditions before forcing resume
+        "check_interval": 0.2         # How often to check if safe to resume
+    }
 }
 
 # VAD (Voice Activity Detection) settings
@@ -121,12 +53,12 @@ VAD_CONFIG = {
         "type": "server_vad",
         "threshold": 0.4,  # Lower threshold for better speech detection
         "silence_duration_ms": 700,  # More time for natural pauses in Portuguese
-        "prefix_padding_ms": 400,  # Capture more context before speech
+        "prefix_padding_ms": 400  # Capture more context before speech
     },
     "semantic_vad": {
         "type": "semantic_vad",
-        "eagerness": "medium",  # low, medium, high, auto
-    },
+        "eagerness": "medium"  # low, medium, high, auto
+    }
 }
 
 # Default VAD settings for different modes
@@ -136,30 +68,31 @@ DEFAULT_CONVERSATION_VAD = VAD_CONFIG["semantic_vad"]  # Default for conversatio
 # API endpoints
 API_ENDPOINTS = {
     "realtime": "wss://api.openai.com/v1/realtime",
-    "transcription": "wss://api.openai.com/v1/realtime?intent=transcription",
-    "conversation": "wss://api.openai.com/v1/realtime",
+    "transcription": "wss://api.openai.com/v1/realtime?intent=transcription"
 }
 
 # Noise reduction settings
 NOISE_REDUCTION_CONFIG = {
     "near_field": {"type": "near_field"},
     "far_field": {"type": "far_field"},
-    "disabled": None,
+    "disabled": None
 }
 
 DEFAULT_NOISE_REDUCTION = NOISE_REDUCTION_CONFIG["near_field"]
 
 # Headers for API requests
-API_HEADERS = {"OpenAI-Beta": "realtime=v1"}
+API_HEADERS = {
+    "OpenAI-Beta": "realtime=v1"
+}
 
 # Display settings
 DISPLAY_CONFIG = {
     "colors": {
         "partial": "\033[93m",  # Yellow
-        "final": "\033[92m",  # Green
-        "error": "\033[91m",  # Red
-        "info": "\033[94m",  # Blue
-        "reset": "\033[0m",  # Reset
+        "final": "\033[92m",    # Green
+        "error": "\033[91m",    # Red
+        "info": "\033[94m",     # Blue
+        "reset": "\033[0m"      # Reset
     },
     "emojis": {
         "mic": "🎤",
@@ -168,18 +101,17 @@ DISPLAY_CONFIG = {
         "error": "❌",
         "success": "✅",
         "stop": "🛑",
-        "rocket": "🚀",
-    },
+        "rocket": "🚀"
+    }
 }
 
-
-# Session configuration template
+# Session configuration functions
 def get_transcription_session_config(
-    model=None,
-    vad_config=None,
+    model=None, 
+    vad_config=None, 
     noise_reduction=None,
     include_logprobs=False,
-    language=None,
+    language=None
 ):
     """Get transcription session configuration"""
     # Try with session wrapper for transcription_session.update
@@ -188,20 +120,26 @@ def get_transcription_session_config(
         "input_audio_transcription": {
             "model": model or DEFAULT_TRANSCRIPTION_MODEL,
             "prompt": "Transcreva o áudio em português brasileiro com precisão. Mantenha pontuação e capitalização apropriadas.",
-            "language": language or "pt",
+            "language": language or "pt"
         },
         "turn_detection": vad_config or DEFAULT_VAD,
-        "input_audio_noise_reduction": noise_reduction or DEFAULT_NOISE_REDUCTION,
+        "input_audio_noise_reduction": noise_reduction or DEFAULT_NOISE_REDUCTION
     }
-
+    
     # Only add include if logprobs are requested
     if include_logprobs:
         session_config["include"] = ["item.input_audio_transcription.logprobs"]
+    
+    return {
+        "type": "transcription_session.update",
+        "session": session_config
+    }
 
-    return {"type": "transcription_session.update", "session": session_config}
-
-
-def get_conversation_session_config(model=None, vad_config=None, voice="verse"):
+def get_conversation_session_config(
+    model=None,
+    vad_config=None,
+    voice="verse"
+):
     """Get conversation session configuration"""
     return {
         "type": "session.update",
@@ -210,141 +148,121 @@ def get_conversation_session_config(model=None, vad_config=None, voice="verse"):
             "voice": voice,
             "turn_detection": vad_config or DEFAULT_VAD,
             "input_audio_format": AUDIO_CONFIG["input_format"],
-            "output_audio_format": AUDIO_CONFIG["input_format"],
-        },
+            "output_audio_format": AUDIO_CONFIG["input_format"]
+        }
     }
 
+# Trigger system configuration
+TRIGGER_CONFIG = {
+    "enabled": True,
+    "buffer_duration_seconds": 60,
+    "llm_model": "gpt-4o-mini",  # Model for validation
+    "enabled_triggers": ["assistant", "test"],  # Assistant and test triggers enabled
+    "async_validation": True,
+    "validation_timeout": 8.0  # seconds
+}
 
-def get_assistant_session_config(instructions=None, model=None, voice=None, vad_config=None):
-    """Get assistant mode session configuration for speech-to-speech conversations"""
-    config = ASSISTANT_MODE_CONFIG
-    return {
-        "type": "session.update",
-        "session": {
-            "model": model or config["conversation_model"],
-            "voice": voice or config["voice"],
-            "instructions": instructions or config["instructions"],
-            "turn_detection": vad_config or DEFAULT_CONVERSATION_VAD,
-            "input_audio_format": AUDIO_CONFIG["input_format"],
-            "output_audio_format": AUDIO_CONFIG["input_format"],
-            "modalities": ["text", "audio"],
-        },
-    }
-
-
-# Transcription-only configuration - no triggers or TTS
-TRANSCRIPTION_ONLY = True
+# TTS system configuration - Using OpenAI client library (NOT Realtime API)
+TTS_CONFIG = {
+    "enabled": True,
+    "provider": "openai",  # Using OpenAI client library for TTS
+    "model": "tts-1",  # OpenAI TTS model (tts-1 or tts-1-hd)
+    "voice": "alloy",  # Available voices: alloy, echo, fable, onyx, nova, shimmer
+    "speed": 1.0,  # Speech speed (0.25 to 4.0)
+    "language": "pt-BR",  # Portuguese (Brazil)
+    "output_audio_format": "pcm",  # Raw PCM format
+    "output_sample_rate": 24000,  # Native 24kHz output
+    
+    # Queue and processing settings
+    "queue_size": 10,
+    "playback_chunk_size": 2048,  # Larger chunks for 24kHz
+    "mixing_enabled": True,  # Allow overlapping TTS responses
+    
+    # Interruption settings
+    "allow_interruption": True,  # Enable/disable TTS interruption
+    "interruption_fade_ms": 50,  # Fade duration in ms to avoid audio pop
+    "interruption_debounce_ms": 100,  # Debounce to prevent false triggers
+    
+    # Echo prevention settings
+    "hardware_latency_delay": 0.3  # Additional delay after playback completes
+}
 
 # Conversation management configuration
 CONVERSATION_CONFIG = {
     "enabled": True,  # Enable multi-turn conversation support
     "timeout_ms": 2000,  # Max time to wait for follow-up (milliseconds)
     "quick_response_ms": 500,  # Time to wait for seemingly complete queries
-    "merge_transcriptions": True,  # Merge related transcriptions
-    # Portuguese conversation starters and incomplete patterns
-    "conversation_starters": [
-        "ei",
-        "oi",
-        "olá",
-        "alô",
-        "escuta",
-        "olha",
-        "veja",
-        "me diga",
-        "me fala",
-        "você pode",
-        "boti",
-        "bote",
-        "bot",
-    ],
-    # Incomplete query indicators
-    "incomplete_indicators": [
-        "hanging_prepositions",  # de, do, da, para, com, etc.
-        "question_words_only",  # o que, quem, quando, etc.
-        "verb_only",  # é, foi, está, etc.
-        "command_without_object",  # pesquisa, busca, etc.
-    ],
+    "merge_transcriptions": True  # Merge related transcriptions
 }
 
-# Context management configuration
+# Enhanced context management configuration
 CONTEXT_CONFIG = {
     "enabled": True,
     "raw_window_minutes": 5,  # Minutes to keep in raw format
-    "summarization_model": "gpt-4.1-nano",  # Cost-efficient model for summarization
-    "summarization_interval": 60,  # Seconds between summarization attempts
-    "persistence_enabled": True,  # Enable context persistence to disk
-    "persistence_interval": 60,  # Seconds between auto-saves
-    "persistence_dir": "./context_storage",  # Directory for context files
-    "max_persistence_files": 10,  # Maximum number of context files to keep
+    "summarization_model": "gpt-4o-mini",  # Model for summarization
+    "persistence": {
+        "enabled": True,
+        "directory": "./context",
+        "max_file_size_mb": 10,
+        "auto_save_interval": 30  # Seconds
+    }
 }
 
-# Trigger system configuration
-TRIGGER_CONFIG = {
-    "enabled": True,  # Enable/disable trigger system
-    "buffer_duration_seconds": 60,  # Conversation context buffer duration
-    "llm_model": "gpt-4.1-mini",  # Model for trigger validation (fast)
-    "enabled_triggers": ["test"],  # List of enabled trigger names
-    "validation_timeout": 8.0,  # Timeout for LLM validation in seconds
+# Tool system configuration
+TOOL_CONFIG = {
+    "enabled_tools": ["datetime"],  # DateTime tool enabled for testing
+    "tool_directories": ["./realtime/tools"],  # Where to look for tools
+    "auto_discover": True  # Auto-discover tools from directories
 }
 
-# TTS (Text-to-Speech) configuration
-TTS_CONFIG = {
-    "enabled": True,  # Enable/disable TTS responses
-    "model": "tts-1",  # TTS model
-    "voice": "nova",  # Voice selection (alloy, echo, fable, onyx, nova, shimmer)
-    "speed": 1.0,  # Speech speed (0.25 to 4.0)
-    "output_sample_rate": 24000,  # Sample rate for TTS output
-    "playback_chunk_size": 2048,  # Chunk size for audio playback
-    "hardware_latency_delay": 0.2,  # Hardware latency delay in seconds
-}
-
-# Assistant Mode (Speech-to-Speech) configuration
-ASSISTANT_MODE_CONFIG = {
-    "enabled": True,  # Enable/disable Assistant Mode
-    "conversation_model": DEFAULT_CONVERSATION_MODEL,  # Model for conversation mode
-    "voice": "verse",  # Voice for assistant responses (alloy, ash, ballad, coral, echo, sage, shimmer, verse)
-    "instructions": "Você é um assistente de voz em português brasileiro. Seja útil, conciso e natural nas suas respostas. Mantenha o contexto da conversa anterior.",
-    "session_timeout": 300,  # Maximum conversation duration in seconds (5 minutes)
-    "idle_timeout": 30,  # Timeout for silence before ending conversation (seconds)
-    "context_injection": True,  # Inject conversation context into assistant session
-    "max_context_length": 2000,  # Maximum characters from context to inject
-    "wake_phrases": [
-        # Portuguese phrases
-        "assistente", "ei assistente", "olá assistente", "hey assistente",
-        # English phrases  
-        "assistant", "hey assistant", "hello assistant",
+# Assistant mode configuration
+ASSISTANT_CONFIG = {
+    "enabled": True,
+    "activation_phrases": [
+        "hey bot", "fala bot", "ei bot", "oi bot", 
+        "alô bot", "olá bot", "ok bot", "hi bot", "hello bot"
     ],
     "end_phrases": [
-        # Portuguese phrases
-        "tchau", "até logo", "obrigado", "obrigada", "fim", "terminar", "parar",
-        # English phrases
-        "bye", "goodbye", "thanks", "thank you", "stop", "end", "finish",
+        "obrigado bot", "obrigada bot", "thank you bot", "thanks bot",
+        "tchau bot", "bye bot", "até logo bot", "goodbye bot",
+        "encerrar conversa", "end conversation", "terminar sessão"
     ],
+    "session_timeout": 300,  # Maximum session duration in seconds (5 minutes)
+    "model": "gpt-4o-realtime-preview-2025-06-03",  # Realtime model for assistant
+    "voice": "alloy",  # Voice for assistant responses
+    "tools_enabled": ["datetime", "calculator", "search", "weather"],  # All available tools
+    "auto_end_silence": 30,  # Seconds of silence before auto-ending session
+    "vad_mode": "server_vad",  # VAD mode for assistant sessions
+    "vad_config": {
+        "type": "server_vad",
+        "threshold": 0.4,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 700
+    }
 }
 
-# Connection timeout for transcription
-CONNECTION_TIMEOUT = 20.0
-
-# System timing configuration
-TIMING_CONFIG = {
-    "context_summarization_interval": 5.0,  # How often to check for summarization (seconds)
-    "context_error_retry_delay": 10.0,  # Delay after context error before retry (seconds)
-    "audio_stream_cleanup_delay": 0.1,  # Delay for audio stream cleanup (seconds)
-    "tts_queue_check_interval": 0.1,  # TTS queue processing interval (seconds)
-    "tts_chunk_delay": 0.01,  # Delay between TTS audio chunks (seconds)
-    "conversation_check_interval": 0.05,  # Conversation state check interval (seconds)
-    "health_monitor_interval": 1.0,  # Health check interval (seconds)
-}  # Timeout for WebSocket connection in seconds
+# Realtime API configuration
+REALTIME_CONFIG = {
+    "api_endpoint": "wss://api.openai.com/v1/realtime",
+    "api_version": "v1",
+    "audio_format": "pcm16",  # Audio format for input/output
+    "sample_rate": 24000,  # Native sample rate for Realtime API
+    "connection_timeout": 20.0,  # Timeout for WebSocket connection in seconds
+    "vad_config": {
+        "type": "server_vad",
+        "threshold": 0.4,
+        "prefix_padding_ms": 300,
+        "silence_duration_ms": 700
+    }
+}
 
 # Logging configuration
 LOGGING_CONFIG = {
     "log_level": os.getenv("LOG_LEVEL", "INFO"),
     "log_dir": os.getenv("LOG_DIR", "./logs"),
     "enable_file_logging": os.getenv("ENABLE_FILE_LOGGING", "true").lower() == "true",
-    "enable_console_logging": os.getenv("ENABLE_CONSOLE_LOGGING", "true").lower()
-    == "true",
-    "structured_logging": os.getenv("ENVIRONMENT", "development").lower()
-    == "production",
+    "enable_console_logging": os.getenv("ENABLE_CONSOLE_LOGGING", "true").lower() == "true", 
+    "structured_logging": os.getenv("ENVIRONMENT", "development").lower() == "production",
     "max_log_size_mb": int(os.getenv("MAX_LOG_SIZE_MB", "10")),
     "backup_count": int(os.getenv("LOG_BACKUP_COUNT", "5")),
 }
