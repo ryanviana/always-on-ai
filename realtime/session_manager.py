@@ -93,6 +93,11 @@ class RealtimeSessionManager:
         # Connection error tracking
         self._connection_error = None
         
+        # Heartbeat tracking
+        self._heartbeat_timer = None
+        self._heartbeat_interval = 30.0  # Send ping every 30 seconds
+        self._last_pong_time = None
+        
         self.logger.debug("RealtimeSessionManager initialized with audio_handler=None")
         
     @property
@@ -240,6 +245,9 @@ class RealtimeSessionManager:
         self.connected = True
         print("[REALTIME] Successfully connected to OpenAI Realtime API")
         
+        # Start heartbeat
+        self._start_heartbeat()
+        
         # Configure session
         vad_config = VAD_CONFIG.get(self.vad_mode, DEFAULT_CONVERSATION_VAD).copy()
         vad_config["create_response"] = True
@@ -350,6 +358,9 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
         try:
             event = json.loads(message)
             event_type = event.get("type")
+            
+            # Update heartbeat tracking on any message
+            self._last_pong_time = time.time()
             
             # Log all events for debugging (except high-frequency ones)
             if event_type not in ["response.audio.delta", "input_audio_buffer.append"]:
@@ -716,8 +727,11 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
                     # Trigger response generation after sending function output
                     ws_ref.send(json.dumps({"type": "response.create"}))
                     print(f"[FUNCTION_CALL] Function output sent for {tool_name} and response triggered")
+                except websocket.WebSocketConnectionClosedException:
+                    self.connected = False
+                    self.logger.warning(f"WebSocket closed while sending tool response for {tool_name}")
                 except Exception as e:
-                    print(f"[ERROR] Failed to send tool response: {e}")
+                    self.logger.error(f"Failed to send tool response: {e}", exc_info=True)
         
         # Create a new event loop for async execution
         def run_tool():
@@ -729,8 +743,27 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
                         call_id, tool_name, arguments_json, response_callback
                     )
                 )
+            except Exception as e:
+                self.logger.error(f"Tool execution failed for {tool_name}: {e}", exc_info=True)
+                # Try to send error response if still connected
+                if self.connected:
+                    try:
+                        error_response = {
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "function_call_output",
+                                "call_id": call_id,
+                                "output": f"Error executing {tool_name}: {str(e)}"
+                            }
+                        }
+                        response_callback(error_response)
+                    except Exception as send_err:
+                        self.logger.error(f"Failed to send error response: {send_err}")
             finally:
-                loop.close()
+                try:
+                    loop.close()
+                except Exception as close_err:
+                    self.logger.error(f"Failed to close event loop: {close_err}")
         
         # Run in separate thread to avoid blocking
         threading.Thread(target=run_tool, daemon=True, name=f"ToolExecution-{tool_name}").start()
@@ -749,9 +782,14 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
             }
             try:
                 ws_ref.send(json.dumps(message))
+            except websocket.WebSocketConnectionClosedException:
+                # Connection closed, mark as disconnected
+                self.connected = False
+                if self.session_active:
+                    self.logger.debug("WebSocket connection closed while sending audio")
             except Exception as e:
                 if self.session_active:  # Only log if we should be active
-                    print(f"Error sending audio: {e}")
+                    self.logger.error(f"Error sending audio: {e}")
                 
     def send_text(self, text: str, out_of_band: bool = False, metadata: Optional[Dict[str, Any]] = None):
         """Send text message to the session
@@ -949,9 +987,11 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
         # Close WebSocket safely
         if self.ws:
             try:
-                self.ws.close()
+                # Check if WebSocket is still open before closing
+                if hasattr(self.ws, 'sock') and self.ws.sock:
+                    self.ws.close()
             except Exception as e:
-                print(f"Error closing Realtime WebSocket: {e}")
+                self.logger.debug(f"Error closing Realtime WebSocket: {e}")
             finally:
                 self.ws = None
         
@@ -1094,13 +1134,72 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
             # Only end if user really meant to say goodbye and hasn't continued talking
             self._schedule_session_end(delay=0.1, reason="goodbye_timeout")
     
+    def _start_heartbeat(self):
+        """Start heartbeat to keep connection alive"""
+        if self._heartbeat_timer:
+            self._heartbeat_timer.cancel()
+        self._last_pong_time = time.time()
+        self._schedule_next_heartbeat()
+    
+    def _schedule_next_heartbeat(self):
+        """Schedule the next heartbeat"""
+        if self.connected and self.session_active:
+            self._heartbeat_timer = threading.Timer(self._heartbeat_interval, self._send_heartbeat)
+            self._heartbeat_timer.daemon = True
+            self._heartbeat_timer.start()
+    
+    def _send_heartbeat(self):
+        """Send heartbeat ping to keep connection alive"""
+        if not self.connected or not self.session_active:
+            return
+            
+        try:
+            # Check if we've received a response recently
+            if self._last_pong_time and time.time() - self._last_pong_time > 90:
+                print(f"[REALTIME WARNING] No response for {time.time() - self._last_pong_time:.0f}s, connection may be stale")
+                # Attempt reconnect
+                self._attempt_reconnect()
+                return
+            
+            # Send a minimal message to keep connection alive
+            if self.ws:
+                # OpenAI Realtime API doesn't have a specific ping, so we'll send a minimal update
+                heartbeat_msg = {
+                    "type": "input_audio_buffer.clear"  # Minimal message that doesn't affect state
+                }
+                self.ws.send(json.dumps(heartbeat_msg))
+                print(f"[HEARTBEAT] Sent heartbeat at {time.strftime('%H:%M:%S')}")
+            
+            # Schedule next heartbeat
+            self._schedule_next_heartbeat()
+            
+        except Exception as e:
+            print(f"[HEARTBEAT ERROR] Failed to send heartbeat: {e}")
+            # Connection likely lost, attempt reconnect
+            self.connected = False
+            self._attempt_reconnect()
+    
+    def _stop_heartbeat(self):
+        """Stop heartbeat timer"""
+        if self._heartbeat_timer:
+            self._heartbeat_timer.cancel()
+            self._heartbeat_timer = None
+    
     def _attempt_reconnect(self):
         """Attempt to reconnect WebSocket if session is still active"""
-        if not self.session_active or self._reconnect_attempts >= self._max_reconnect_attempts:
-            if self._reconnect_attempts >= self._max_reconnect_attempts:
-                print(f"[REALTIME ERROR] Max reconnect attempts ({self._max_reconnect_attempts}) reached")
-                # Don't end session on reconnect failures - keep trying or wait for goodbye
-                print(f"[REALTIME] Session {self.session_id} will remain active despite connection issues")
+        if not self.session_active:
+            print("[REALTIME] Session not active, skipping reconnect")
+            return
+            
+        if self._reconnect_attempts >= self._max_reconnect_attempts:
+            print(f"[REALTIME ERROR] Max reconnect attempts ({self._max_reconnect_attempts}) reached")
+            # Don't end session on reconnect failures - keep trying or wait for goodbye
+            print(f"[REALTIME] Session {self.session_id} will remain active despite connection issues")
+            # Try one more time after a longer delay
+            delay = 30.0
+            print(f"[REALTIME] Will retry in {delay}s...")
+            self._reconnect_timer = threading.Timer(delay, self._execute_reconnect)
+            self._reconnect_timer.start()
             return
             
         self._reconnect_attempts += 1
@@ -1235,6 +1334,9 @@ When the user says goodbye or thanks you to end the conversation, acknowledge it
         if self._reconnect_timer:
             self._reconnect_timer.cancel()
             self._reconnect_timer = None
+            
+        # Stop heartbeat
+        self._stop_heartbeat()
             
         if self.session_active:
             self.end_session()
