@@ -512,8 +512,13 @@ class VoiceAssistant:
 def signal_handler(sig, frame):
     """Handle Ctrl+C gracefully"""
     global assistant
-    assistant.stop()
-    sys.exit(0)
+    try:
+        print("\n\nShutting down gracefully...")
+        assistant.stop()
+    except Exception as e:
+        print(f"Error during shutdown: {e}")
+    finally:
+        sys.exit(0)
 
 
 if __name__ == "__main__":

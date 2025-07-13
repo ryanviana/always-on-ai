@@ -95,9 +95,22 @@ def main():
     # Handle shutdown
     def signal_handler(sig, frame):
         print("\n\n🛑 Shutting down...")
-        assistant_process.terminate()
-        dashboard_process.terminate()
-        sys.exit(0)
+        try:
+            # Try graceful shutdown first
+            assistant_process.terminate()
+            dashboard_process.terminate()
+            
+            # Give them time to shut down gracefully
+            assistant_process.wait(timeout=5)
+            dashboard_process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            print("⚠️  Force killing processes...")
+            assistant_process.kill()
+            dashboard_process.kill()
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+        finally:
+            sys.exit(0)
     
     signal.signal(signal.SIGINT, signal_handler)
     
