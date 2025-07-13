@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant Context Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #4CAF50;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+
+        button.danger {
+            background-color: #f44336;
+        }
+
+        button.danger:hover {
+            background-color: #da190b;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .status.connected {
+            background-color: #4CAF50;
+        }
+
+        .status.disconnected {
+            background-color: #f44336;
+        }
+
+        .stats {
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-item {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .context-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .context-sections {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section {
+            background-color: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .section h2 {
+            color: #4CAF50;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .summary-content {
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+        }
+
+        .entries-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .entry {
+            background-color: #333;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            position: relative;
+        }
+
+        .entry-speaker {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .entry-speaker.assistant {
+            color: #2196F3;
+        }
+
+        .entry-time {
+            font-size: 11px;
+            color: #888;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+
+        .entry-text {
+            margin-top: 5px;
+        }
+
+        .update-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            padding: 10px 20px;
+            border-radius: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .update-indicator.show {
+            opacity: 1;
+        }
+
+        .connection-type {
+            margin-left: 20px;
+        }
+
+        select {
+            background-color: #333;
+            color: white;
+            border: 1px solid #555;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+
+        .error-message {
+            background-color: #f44336;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voice Assistant Context Viewer</h1>
+        
+        <div class="controls">
+            <button id="connectBtn" onclick="toggleConnection()">Connect</button>
+            <button onclick="refreshContext()">Refresh</button>
+            <button onclick="triggerSummarization()">Summarize Now</button>
+            <button class="danger" onclick="clearContext()">Clear Context</button>
+            <span class="status disconnected" id="status">Disconnected</span>
+            
+            <div class="connection-type">
+                <label for="connectionType">Connection: </label>
+                <select id="connectionType" onchange="changeConnectionType()">
+                    <option value="websocket">WebSocket</option>
+                    <option value="http">HTTP Polling</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="stats" id="stats">
+            <div class="stat-item">
+                <div class="stat-label">Total Entries</div>
+                <div class="stat-value" id="totalEntries">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Recent Entries</div>
+                <div class="stat-value" id="recentEntries">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Summarizations</div>
+                <div class="stat-value" id="summarizations">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Summary Age</div>
+                <div class="stat-value" id="summaryAge">0m</div>
+            </div>
+        </div>
+        
+        <div class="context-sections">
+            <div class="section">
+                <h2>Summary</h2>
+                <div class="summary-content" id="summary">No summary yet...</div>
+            </div>
+            
+            <div class="section">
+                <h2>Recent Conversation</h2>
+                <div class="entries-list" id="entries"></div>
+            </div>
+        </div>
+        
+        <div class="update-indicator" id="updateIndicator">Context Updated</div>
+    </div>
+
+    <script>
+        let ws = null;
+        let httpPoller = null;
+        let connected = false;
+        let connectionType = 'websocket';
+        
+        const wsUrl = 'ws://localhost:8765';
+        const httpUrl = 'http://localhost:8080';
+        
+        function showError(message) {
+            const errorEl = document.getElementById('errorMessage');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => {
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+        
+        function updateUI(data) {
+            // Update stats
+            const stats = data.stats || {};
+            document.getElementById('totalEntries').textContent = stats.total_entries || 0;
+            document.getElementById('recentEntries').textContent = stats.recent_count || 0;
+            document.getElementById('summarizations').textContent = stats.summarizations || 0;
+            document.getElementById('summaryAge').textContent = 
+                Math.round(stats.summary_age_minutes || 0) + 'm';
+            
+            // Update summary
+            document.getElementById('summary').textContent = data.summary || 'No summary yet...';
+            
+            // Update recent entries
+            const entriesEl = document.getElementById('entries');
+            entriesEl.innerHTML = '';
+            
+            const recent = data.recent || [];
+            recent.reverse().forEach(entry => {
+                const entryEl = document.createElement('div');
+                entryEl.className = 'entry';
+                
+                const time = new Date(entry.timestamp * 1000).toLocaleTimeString();
+                const speakerClass = entry.speaker === 'assistant' ? 'assistant' : '';
+                
+                entryEl.innerHTML = `
+                    <div class="entry-speaker ${speakerClass}">${entry.speaker}</div>
+                    <div class="entry-time">${time}</div>
+                    <div class="entry-text">${entry.text}</div>
+                `;
+                
+                entriesEl.appendChild(entryEl);
+            });
+            
+            // Show update indicator
+            const indicator = document.getElementById('updateIndicator');
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 1000);
+        }
+        
+        function connectWebSocket() {
+            if (ws) return;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                connected = true;
+                updateConnectionStatus();
+                console.log('Connected to WebSocket server');
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    
+                    if (message.type === 'initial_context' || 
+                        message.type === 'context_update' || 
+                        message.type === 'context_response') {
+                        updateUI(message.data);
+                    }
+                } catch (e) {
+                    console.error('Error parsing message:', e);
+                }
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                showError('WebSocket connection error');
+            };
+            
+            ws.onclose = () => {
+                ws = null;
+                connected = false;
+                updateConnectionStatus();
+                console.log('Disconnected from WebSocket server');
+            };
+        }
+        
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function startHttpPolling() {
+            if (httpPoller) return;
+            
+            connected = true;
+            updateConnectionStatus();
+            
+            const poll = async () => {
+                try {
+                    const response = await fetch(`${httpUrl}/context`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateUI(data);
+                    }
+                } catch (e) {
+                    console.error('HTTP polling error:', e);
+                    showError('HTTP connection error');
+                }
+            };
+            
+            // Initial poll
+            poll();
+            
+            // Poll every 2 seconds
+            httpPoller = setInterval(poll, 2000);
+        }
+        
+        function stopHttpPolling() {
+            if (httpPoller) {
+                clearInterval(httpPoller);
+                httpPoller = null;
+                connected = false;
+                updateConnectionStatus();
+            }
+        }
+        
+        function updateConnectionStatus() {
+            const statusEl = document.getElementById('status');
+            const connectBtn = document.getElementById('connectBtn');
+            
+            if (connected) {
+                statusEl.textContent = 'Connected';
+                statusEl.className = 'status connected';
+                connectBtn.textContent = 'Disconnect';
+            } else {
+                statusEl.textContent = 'Disconnected';
+                statusEl.className = 'status disconnected';
+                connectBtn.textContent = 'Connect';
+            }
+        }
+        
+        function toggleConnection() {
+            if (connected) {
+                if (connectionType === 'websocket') {
+                    disconnectWebSocket();
+                } else {
+                    stopHttpPolling();
+                }
+            } else {
+                if (connectionType === 'websocket') {
+                    connectWebSocket();
+                } else {
+                    startHttpPolling();
+                }
+            }
+        }
+        
+        function changeConnectionType() {
+            const select = document.getElementById('connectionType');
+            const newType = select.value;
+            
+            // Disconnect current
+            if (connected) {
+                if (connectionType === 'websocket') {
+                    disconnectWebSocket();
+                } else {
+                    stopHttpPolling();
+                }
+            }
+            
+            connectionType = newType;
+        }
+        
+        async function refreshContext() {
+            if (connectionType === 'websocket' && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: 'get_context' }));
+            } else if (connectionType === 'http') {
+                try {
+                    const response = await fetch(`${httpUrl}/context`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateUI(data);
+                    }
+                } catch (e) {
+                    showError('Failed to refresh context');
+                }
+            }
+        }
+        
+        async function triggerSummarization() {
+            if (connectionType === 'websocket' && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: 'trigger_summarization' }));
+            } else if (connectionType === 'http') {
+                try {
+                    await fetch(`${httpUrl}/summarize`, { method: 'POST' });
+                    refreshContext();
+                } catch (e) {
+                    showError('Failed to trigger summarization');
+                }
+            }
+        }
+        
+        async function clearContext() {
+            if (!confirm('Are you sure you want to clear all context?')) return;
+            
+            if (connectionType === 'websocket' && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ command: 'clear_context' }));
+            } else if (connectionType === 'http') {
+                try {
+                    await fetch(`${httpUrl}/clear`, { method: 'POST' });
+                    refreshContext();
+                } catch (e) {
+                    showError('Failed to clear context');
+                }
+            }
+        }
+        
+        // Auto-connect on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                toggleConnection();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

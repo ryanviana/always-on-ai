@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-950 text-gray-100;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply backdrop-blur-md bg-dark-900/30 border border-dark-800/50;
+  }
+  
+  .neon-glow {
+    @apply shadow-[0_0_15px_rgba(34,197,94,0.5)];
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
+  }
+}

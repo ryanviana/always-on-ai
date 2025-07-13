@@ -281,5 +281,6 @@ memory/cache/
 
 # Context storage
 context_storage/ 
+context/*.json.gz
 # API Security
 context/.api_key
