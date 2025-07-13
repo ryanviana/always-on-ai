@@ -4,27 +4,22 @@ Base trigger class for all triggers
 
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
+import json
+import openai
 import os
 from pathlib import Path
-from jinja2 import Environment
-import openai
+from jinja2 import Environment, FileSystemLoader
+from dotenv import load_dotenv
 
-from .models import TriggerConfig, ValidationResult, TriggerResponse, DEFAULT_TEMPERATURE, DEFAULT_MAX_TOKENS
-from .utils import parse_llm_json_response, setup_trigger_logger
-from .exceptions import TriggerValidationError, LLMConnectionError
+load_dotenv()
 
 
 class BaseTrigger(ABC):
     """Abstract base class for all triggers"""
     
-    # Class-level OpenAI client cache
-    _openai_client = None
-    _api_key_checked = False
-    
     def __init__(self):
         self.name = self.__class__.__name__
         self.enabled = True
-        self.logger = setup_trigger_logger(f"trigger.{self.name}")
         
     @property
     @abstractmethod
@@ -43,8 +38,7 @@ class BaseTrigger(ABC):
         
     @abstractmethod
     def action(self, validation_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """
-        Action to execute when trigger is validated
+        """Action to execute when trigger is validated
         
         Returns:
             Optional dict with:
@@ -59,19 +53,8 @@ class BaseTrigger(ABC):
         text_lower = text.lower()
         return any(keyword.lower() in text_lower for keyword in self.keywords)
         
-    def render_template(self, template_env: Environment, transcription_text: str, 
-                       conversation_history: Optional[str] = None) -> str:
-        """
-        Render the validation prompt using jinja2 template
-        
-        Args:
-            template_env: Jinja2 environment
-            transcription_text: Current transcription
-            conversation_history: Optional conversation context
-            
-        Returns:
-            Rendered template string
-        """
+    def render_template(self, template_env: Environment, transcription_text: str, conversation_history: str = None) -> str:
+        """Render the validation prompt using jinja2 template"""
         template = template_env.get_template("trigger_validation.j2")
         
         # Build context from class variables
@@ -90,34 +73,12 @@ class BaseTrigger(ABC):
         }
         
         return template.render(**context)
-    
-    @classmethod
-    def _get_openai_client(cls):
-        """Get or create the shared OpenAI client"""
-        # Check if we already have a client
-        if cls._openai_client is not None:
-            return cls._openai_client
         
-        # Check API key only once
-        if not cls._api_key_checked:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise LLMConnectionError("OPENAI_API_KEY not found in environment")
-            cls._api_key_checked = True
-            
-            # Create the client once
-            cls._openai_client = openai.AsyncOpenAI(api_key=api_key)
-        
-        return cls._openai_client
-        
-    async def validate_with_llm(self, context: str, model: str = "gpt-4o-mini", 
-                               template_env: Optional[Environment] = None) -> Optional[Dict[str, Any]]:
+    async def validate_with_llm(self, context: str, model: str = "gpt-4o-mini", template_env: Environment = None) -> Optional[Dict[str, Any]]:
         """Validate trigger with LLM using conversation context and jinja2 template"""
         try:
-            # Get the shared OpenAI client
-            client = self._get_openai_client()
-            
-            self.logger.debug(f"Validating with {model}")
+            # Create OpenAI client
+            client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
             
             # Render prompt using template
             if template_env:
@@ -132,34 +93,35 @@ class BaseTrigger(ABC):
                 prompt = f"Analyze this transcription for trigger '{self.name}': {context}"
             
             # Call OpenAI API
-            self.logger.debug("Calling OpenAI API")
             response = await client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": "You are a trigger validation system. Respond only with valid JSON."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=DEFAULT_TEMPERATURE,
-                max_tokens=DEFAULT_MAX_TOKENS
+                temperature=0.3,
+                max_tokens=200
             )
             
             # Parse response
             result_text = response.choices[0].message.content.strip()
-            result_dict = parse_llm_json_response(result_text)
+            
+            # Try to extract JSON from the response
+            if result_text.startswith("```json"):
+                result_text = result_text[7:]
+            if result_text.endswith("```"):
+                result_text = result_text[:-3]
+                
+            result = json.loads(result_text)
             
             # Check if trigger should fire
-            triggered = result_dict.get("triggered", False)
-            confidence = result_dict.get("confidence", 0.0)
-            
-            if triggered:
-                self.logger.info(f"Validation SUCCESS (confidence: {confidence:.2f})")
-                return result_dict
+            if result.get("triggered", False):
+                return result
             else:
-                self.logger.debug(f"Validation REJECTED (confidence: {confidence:.2f})")
                 return None
                 
         except Exception as e:
-            self.logger.error(f"Validation error: {e}", exc_info=True)
+            print(f"Error validating trigger {self.name}: {e}")
             return None
             
     def __str__(self):

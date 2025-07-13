@@ -58,9 +58,9 @@ class TestTrigger(BaseTrigger):
     def action(self, validation_result: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the test trigger action"""
         reason = validation_result.get("reason", "No reason provided")
-        self.logger.info("🎯 TEST TRIGGER FIRED!")
-        self.logger.info(f"Reason: {reason}")
-        self.logger.info("This confirms the trigger system is working!")
+        print(f"\n🎯 TEST TRIGGER FIRED!")
+        print(f"   Reason: {reason}")
+        print(f"   This confirms the trigger system is working!\n")
         
         # Return TTS response
         return {
