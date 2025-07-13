@@ -1,5 +1,5 @@
 """
-Central event bus for tracking and broadcasting system events - Simplified for transcription
+Central event bus for tracking and broadcasting system events
 """
 
 import time
@@ -7,12 +7,9 @@ import json
 import threading
 from typing import Dict, Any, List, Callable, Optional
 from queue import Queue, Empty
-from collections import defaultdict, deque
+from collections import defaultdict
 from datetime import datetime
 import uuid
-from logging_config import get_logger
-
-logger = get_logger(__name__)
 
 
 class SystemEvent:
@@ -44,7 +41,7 @@ class EventBus:
     def __init__(self):
         self.listeners: Dict[str, List[Callable]] = defaultdict(list)
         self.event_queue = Queue()
-        self.event_history = deque(maxlen=1000)  # Automatic size limiting with O(1) operations
+        self.event_history: List[SystemEvent] = []
         self.max_history = 1000
         self._running = True
         self._processor_thread = threading.Thread(target=self._process_events, daemon=True)
@@ -52,7 +49,7 @@ class EventBus:
         
         # Performance metrics
         self.event_counts = defaultdict(int)
-        self.processing_times = defaultdict(lambda: deque(maxlen=100))  # Limit to last 100 measurements
+        self.processing_times = defaultdict(list)
         
     def emit(self, event_type: str, data: Dict[str, Any], source: str = None):
         """Emit an event to the bus"""
@@ -82,31 +79,39 @@ class EventBus:
                 # Track event
                 self.event_counts[event.type] += 1
                 
-                # Add to history (deque automatically handles size limit)
+                # Debug logging for tool events
+                if event.type.startswith('tool.'):
+                    print(f"[DEBUG] Event Bus processing tool event: {event.type} from {event.source}")
+                
+                # Add to history
                 self.event_history.append(event)
+                if len(self.event_history) > self.max_history:
+                    self.event_history.pop(0)
                 
                 # Notify specific listeners
                 for listener in self.listeners.get(event.type, []):
                     try:
                         listener(event)
                     except Exception as e:
-                        logger.error(f"Error in event listener for {event.type}: {e}", exc_info=True)
+                        print(f"Error in event listener for {event.type}: {e}")
                         
                 # Notify wildcard listeners
                 for listener in self.listeners.get("*", []):
                     try:
                         listener(event)
                     except Exception as e:
-                        logger.error(f"Error in wildcard event listener: {e}", exc_info=True)
+                        print(f"Error in wildcard event listener: {e}")
                         
-                # Track processing time (deque automatically handles size limit)
+                # Track processing time
                 processing_time = time.time() - start_time
                 self.processing_times[event.type].append(processing_time)
+                if len(self.processing_times[event.type]) > 100:
+                    self.processing_times[event.type].pop(0)
                     
             except Empty:
                 continue
             except Exception as e:
-                logger.error(f"Error processing event: {e}", exc_info=True)
+                print(f"Error processing event: {e}")
                 
     def get_stats(self) -> Dict[str, Any]:
         """Get event bus statistics"""
@@ -150,26 +155,8 @@ class EventBus:
 event_bus = EventBus()
 
 
-# Event type constants - Simplified for transcription only
+# Event type constants
 class EventTypes:
-    # Audio events
-    AUDIO_CAPTURE_START = "audio.capture_start"
-    AUDIO_CAPTURE_STOP = "audio.capture_stop"
-    AUDIO_MICROPHONE_PAUSE = "audio.microphone_pause"
-    AUDIO_MICROPHONE_RESUME = "audio.microphone_resume"
-    AUDIO_MICROPHONE_STATE = "audio.microphone_state"
-    REQUEST_MICROPHONE_STATE = "request.microphone_state"
-    
-    # Transcription events
-    TRANSCRIPTION_START = "transcription.start"
-    TRANSCRIPTION_COMPLETE = "transcription.complete"
-    TRANSCRIPTION_ERROR = "transcription.error"
-    
-    # System events
-    SYSTEM_START = "system.start"
-    SYSTEM_STOP = "system.stop"
-    SYSTEM_ERROR = "system.error"
-    
     # Trigger events
     TRIGGER_KEYWORD_MATCH = "trigger.keyword_match"
     TRIGGER_VALIDATION_START = "trigger.validation_start"
@@ -178,9 +165,58 @@ class EventTypes:
     TRIGGER_EXECUTION_COMPLETE = "trigger.execution_complete"
     TRIGGER_EXECUTION_ERROR = "trigger.execution_error"
     
-    # Conversation events (Assistant Mode)
-    CONVERSATION_START = "conversation.start"
-    CONVERSATION_END = "conversation.end"
-    CONVERSATION_AUDIO_INPUT = "conversation.audio_input"
-    CONVERSATION_AUDIO_OUTPUT = "conversation.audio_output"
-    CONVERSATION_ERROR = "conversation.error"
+    # Audio events
+    AUDIO_CAPTURE_START = "audio.capture_start"
+    AUDIO_CAPTURE_STOP = "audio.capture_stop"
+    AUDIO_MICROPHONE_PAUSE = "audio.microphone_pause"
+    AUDIO_MICROPHONE_RESUME = "audio.microphone_resume"
+    AUDIO_MICROPHONE_STATE = "audio.microphone_state"
+    REQUEST_MICROPHONE_STATE = "request.microphone_state"
+    AUDIO_PLAYBACK_START = "audio.playback_start"
+    AUDIO_PLAYBACK_COMPLETE = "audio.playback_complete"
+    AUDIO_OUTPUT_LEVEL = "audio.output_level"
+    
+    # Transcription events
+    TRANSCRIPTION_START = "transcription.start"
+    TRANSCRIPTION_COMPLETE = "transcription.complete"
+    TRANSCRIPTION_ERROR = "transcription.error"
+    
+    # TTS events
+    TTS_SYNTHESIS_START = "tts.synthesis_start"
+    TTS_SYNTHESIS_COMPLETE = "tts.synthesis_complete"
+    TTS_PLAYBACK_START = "tts.playback_start"
+    TTS_PLAYBACK_COMPLETE = "tts.playback_complete"
+    
+    # Assistant mode events
+    ASSISTANT_SESSION_START = "assistant.session_start"
+    ASSISTANT_SESSION_END = "assistant.session_end"
+    ASSISTANT_SPEAKING_START = "assistant.speaking_start"
+    ASSISTANT_SPEAKING_END = "assistant.speaking_end"
+    ASSISTANT_LISTENING_START = "assistant.listening_start"
+    ASSISTANT_LISTENING_END = "assistant.listening_end"
+    
+    # Tool events
+    TOOL_CALL_START = "tool.call_start"
+    TOOL_CALL_COMPLETE = "tool.call_complete"
+    TOOL_CALL_ERROR = "tool.call_error"
+    TOOL_PROCESSING_START = "tool.processing_start"
+    TOOL_PROCESSING_END = "tool.processing_end"
+    
+    # Context events
+    CONTEXT_ADD_TRANSCRIPTION = "context.add_transcription"
+    CONTEXT_SUMMARIZATION_START = "context.summarization_start"
+    CONTEXT_SUMMARIZATION_COMPLETE = "context.summarization_complete"
+    CONTEXT_CLEARED = "context.cleared"
+    
+    # System events
+    SYSTEM_START = "system.start"
+    SYSTEM_STOP = "system.stop"
+    SYSTEM_ERROR = "system.error"
+    
+    # WebSocket events
+    WEBSOCKET_CLIENT_CONNECT = "websocket.client_connect"
+    WEBSOCKET_CLIENT_DISCONNECT = "websocket.client_disconnect"
+    WEBSOCKET_MESSAGE_SENT = "websocket.message_sent"
+    
+    # Performance events
+    PERFORMANCE_METRIC = "performance.metric"
