@@ -142,6 +142,28 @@ class EnhancedContextManager:
                 }
             }
             
+    def get_context_for_realtime(self) -> List[Dict[str, Any]]:
+        """Get context formatted for OpenAI Realtime API"""
+        context_data = self.get_full_context()
+        messages = []
+        
+        # Add summary as system context if available
+        if context_data["summary"]:
+            messages.append({
+                "role": "system",
+                "content": f"Previous conversation summary:\n{context_data['summary']}"
+            })
+            
+        # Add recent messages
+        for entry in context_data["recent"]:
+            role = "assistant" if entry["speaker"] == "assistant" else "user"
+            messages.append({
+                "role": role,
+                "content": entry["text"]
+            })
+            
+        return messages
+            
     def get_openai_messages(self) -> List[Dict[str, Any]]:
         """Get context formatted for OpenAI Realtime API"""
         context_data = self.get_full_context()
@@ -212,13 +234,11 @@ class EnhancedContextManager:
                                 loop.close()
                         
                 # Sleep briefly
-                from config import TIMING_CONFIG
-                time.sleep(TIMING_CONFIG.get("context_summarization_interval", 5.0))
+                time.sleep(5.0)  # Check every 5 seconds
                 
             except Exception as e:
                 print(f"Error in summarization worker: {e}")
-                from config import TIMING_CONFIG
-                time.sleep(TIMING_CONFIG.get("context_error_retry_delay", 10.0))
+                time.sleep(10.0)  # Wait 10 seconds on error
                 
     async def _create_summary(self):
         """Perform the actual summarization"""
