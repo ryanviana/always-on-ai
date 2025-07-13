@@ -16,7 +16,7 @@ from config import (
 from logging_config import setup_logging, get_logger
 from config_validator import validate_startup_config, ConfigValidationError
 from triggers import TriggerManager
-from triggers.builtin import TestTrigger, AssistantTrigger
+from triggers.builtin import TestTrigger, AssistantTrigger, RevenueVerificationTrigger
 from context import EnhancedContextManager, ContextPersistence, setup_context_access
 from context.persistence import AutoSaveContextManager
 from core import ConnectionCoordinator, StateManager, AppState
@@ -243,6 +243,9 @@ class VoiceAssistant:
 
         if "test" in enabled_triggers:
             trigger_manager.add_trigger(TestTrigger())
+
+        if "revenue_verification" in enabled_triggers:
+            trigger_manager.add_trigger(RevenueVerificationTrigger())
 
         self.logger.info(f"Loaded {len(trigger_manager.get_triggers())} triggers")
         return trigger_manager

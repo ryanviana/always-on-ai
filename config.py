@@ -157,7 +157,7 @@ TRIGGER_CONFIG = {
     "enabled": True,
     "buffer_duration_seconds": 60,
     "llm_model": "gpt-4o-mini",  # Model for validation
-    "enabled_triggers": ["assistant", "test"],  # Assistant and test triggers enabled
+    "enabled_triggers": ["assistant", "test", "revenue_verification"],  # Assistant, test, and revenue verification triggers enabled
     "async_validation": True,
     "validation_timeout": 8.0  # seconds
 }
