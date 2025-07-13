@@ -21,6 +21,8 @@ class AssistantTrigger(BaseTrigger):
     ]
     
     positive_examples = [
+        "AlwaysOn",
+        "Always On",
         "Hey bot",
         "Fala bot", 
         "Ei bot",
@@ -63,6 +65,8 @@ class AssistantTrigger(BaseTrigger):
     def keywords(self) -> List[str]:
         """Keywords that trigger initial detection"""
         return [
+            # AlwaysOn wake word
+            "alwayson", "always on",
             # Portuguese - Bot variations
             "hey bot", "fala bot", "ei bot", "oi bot", 
             "alô bot", "olá bot", "ok bot",
@@ -101,6 +105,8 @@ class AssistantTrigger(BaseTrigger):
             
         # All wake word phrases (must match validate_with_llm)
         wake_phrases = [
+            # AlwaysOn wake word
+            "alwayson", "always on",
             # Bot variations
             "hey bot", "fala bot", "ei bot", "oi bot", "alô bot", "olá bot", "ok bot", 
             "hi bot", "hello bot",
@@ -162,6 +168,8 @@ class AssistantTrigger(BaseTrigger):
             
         # All wake phrases - simplified list
         wake_phrases = [
+            # AlwaysOn wake word
+            "alwayson", "always on",
             # Bot variations
             "hey bot", "fala bot", "ei bot", "oi bot", "alô bot", "olá bot", "ok bot", 
             "hi bot", "hello bot",
