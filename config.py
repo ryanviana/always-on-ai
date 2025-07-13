@@ -210,7 +210,7 @@ CONTEXT_CONFIG = {
 
 # Tool system configuration
 TOOL_CONFIG = {
-    "enabled_tools": ["datetime"],  # DateTime tool enabled for testing
+    "enabled_tools": ["datetime", "analysis_api"],  # DateTime and Analysis API tools enabled
     "tool_directories": ["./realtime/tools"],  # Where to look for tools
     "auto_discover": True  # Auto-discover tools from directories
 }
@@ -230,7 +230,7 @@ ASSISTANT_CONFIG = {
     "session_timeout": 300,  # Maximum session duration in seconds (5 minutes)
     "model": "gpt-4o-realtime-preview-2025-06-03",  # Realtime model for assistant
     "voice": "alloy",  # Voice for assistant responses
-    "tools_enabled": ["datetime", "calculator", "search", "weather"],  # All available tools
+    "tools_enabled": ["datetime", "calculator", "search", "weather", "analysis_api"],  # All available tools
     "auto_end_silence": 30,  # Seconds of silence before auto-ending session
     "vad_mode": "server_vad",  # VAD mode for assistant sessions
     "vad_config": {
